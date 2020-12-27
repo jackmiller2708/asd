@@ -1,3 +1,4 @@
+// Express Essential Modules
 const createError = require('http-errors');
 const express = require('express');
 const path = require('path');
@@ -9,9 +10,15 @@ const webpack = require('webpack');
 const webpackDevMiddleware = require('webpack-dev-middleware');
 
 // Setup Webpack config
-const config = require('./webpack.config.js');
+let config = require('./webpack.prod');
+
+if (process.env.NODE_ENV !== 'production') {
+    config = require('./webpack.dev');
+}
+
 const compiler = webpack(config);
 
+// Routes
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 

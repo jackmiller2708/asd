@@ -7,7 +7,12 @@
 const app = require('../app');
 const debug = require('debug')('chatsupport-4.0:server');
 const http = require('http');
+
+// Socket.io
 const socketio = require('socket.io');
+
+// Redis Client
+const redis = require('redis');
 
 /**
  * Get port from environment and store in Express.
@@ -19,6 +24,17 @@ app.set('port', port);
 /**
  * Create HTTP server.
  */
+
+// Redis setup
+const redis_url = process.env.REDIS_URL;
+
+if (process.env.ENVIRONMENT === 'development') {
+  require('dotenv').config();
+  redis_url = "redis://127.0.0.1";
+}
+
+const redisClient = redis.createClient(redis_url);
+
 
 const server = http.createServer(app);
 const io = socketio(server);
