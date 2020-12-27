@@ -12,19 +12,34 @@ module.exports = {
     },
     module: {
         rules: [
+            // Processing SASS files.
             {
                 test: /\.s[ac]ss$/i,
                 use: [
-                    // Creates `style` nodes from JS strings
+                    // 3. Creates `style` nodes from JS strings
                     "style-loader",
 
-                    // Translates CSS into CommonJS
+                    // 2. Translates CSS into CommonJS
                     "css-loader",
 
-                    // Compiles Sass to CSS
+                    // 1. Compiles Sass to CSS
                     "sass-loader",
                 ],
             },
+
+            // Importing JQuery.
+            {
+                test: /jquery.+\.js$/,
+                use: [{
+                    loader: 'expose-loader',
+                    options: {
+                        exposes: {
+                            globalName: "$",
+                            override: true,
+                        }},
+                    },
+                ]
+            }
         ],
-    },
+    }
 };
