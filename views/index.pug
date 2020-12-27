@@ -1,7 +1,11 @@
 extends layout
 
+block title
+  title Client
+
 block content
   h1= title
   p Welcome to #{title}
 
+block javascripts
   script(src='index.bundle.js')

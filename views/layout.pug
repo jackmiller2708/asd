@@ -1,6 +1,10 @@
 doctype html
 html
   head
-    title= title
+    block title
+      title= title
   body
     block content
+
+  script(src='/socket.io/socket.io.js')
+  block javascripts
