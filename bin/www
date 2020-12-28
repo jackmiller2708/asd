@@ -136,18 +136,23 @@ adminWorkspace.on('connection', socket => {
     }
   });
 
-  // Send the updated admin list
+  // Send the updated admin list.
   adminWorkspace.emit('adminUpdate', adminWorkspace.adapter.rooms.has('admins') ? [...adminWorkspace.adapter.rooms.get('admins')] : []);
 
+  // When the admin sends a message.
   socket.on('inviteSent', ({from, to, clientId}) => {
+
+    // Signal that the other receives the message
     adminWorkspace.to(to).emit('inviteReceived', {from: from, clientId: clientId});
   });
 
+  // When the invitation is accepted.
   socket.on('inviteAccepted', ({to, clientId}) => {
     adminWorkspace.to(to).emit('inviteAccepted',
         `Admin-${socket.id} has accepted your invitation to join room ${getMeetingRoom(clientId)}`);
   });
 
+  // When the invitation is declined.
   socket.on('inviteDeclined', ({to, clientId}) => {
     adminWorkspace.to(to).emit('inviteDeclined',
         `Admin-${socket.id} has declined your invitation to join room ${getMeetingRoom(clientId)}`);

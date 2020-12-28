@@ -1,6 +1,6 @@
 // STYLESHEETS ==========================
 import '../stylesheets/admin.scss'; // Main stylesheet
-import '../../utils/toast/main.scss';
+import '../../utils/toast/main.scss'; // Toastify Stylesheet
 // Font-Awesome
 import '@fortawesome/fontawesome-free/js/fontawesome'
 import '@fortawesome/fontawesome-free/js/solid'
@@ -304,4 +304,3 @@ const { JSONParseMap } = require('../../utils/mapUtitls');
 
 
 $(document).on('load', load());
-
