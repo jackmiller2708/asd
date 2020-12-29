@@ -122,7 +122,19 @@ redisClient.get(clientListName, (err, data) => {
 adminWorkspace.on('connection', socket => {
   console.log('Admin Connected!');
 
-  socket.join('admins');
+  socket.on('adminLoggedOn', roomId => {
+    socket.join(roomId);
+
+    let adminRooms = adminWorkspace.adapter.rooms
+    let roomIds = Array.from(adminRooms.keys());
+    let roomMap = new Map();
+
+    roomIds.forEach(id => {
+      roomMap.set(id, Array.from(adminRooms.get(id)));
+    })
+
+    adminWorkspace.emit('roomListUpdate', JSONStringifyMap(roomMap));
+  });
 
   // Get the client list when an admin is connected.
   redisClient.get(clientListName, (err, data) => {

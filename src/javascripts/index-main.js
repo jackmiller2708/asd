@@ -26,52 +26,25 @@ let chatInitiated = false;
 /**
  * Handles the document loaded event.
  */
-const load = () => {
-    socket.on('adminConnected', adminId => {
-        socket.emit('adminConnected', adminId);
+const onLoad = () => {
+    socket.on('adminConnected', onAdminConnected);
 
-        if (!chatInitiated) {
-            chatInitiated = !chatInitiated;
-
-            chatboxMsgDisplay.find('p').remove();
-            chatboxForm.find('input').prop('disabled', false);
-            chatboxForm.find('button').prop('disabled', false);
-        }
-    })
-
-    socket.on('message', ({sender, message}) => {
-        if (sender === socket.id) createChatBubble(message.text, 'sender');
-        else createChatBubble(message.text, 'receiver');
-    })
+    socket.on('message', onMessage);
 
     // =================================================================================================================
-    toggleChatBoxBtn.one("click", () => {
-        socket.emit('requestAssistance');
+    toggleChatBoxBtn.one("click", onToggleChatBoxBtnClick);
 
-        setTimeout(() => {
-            createChatBubble('Please wait a moment...', 'receiver');
-        }, 800);
-    });
+    toggleChatBoxBtn.click(onToggleChatBoxBtnToggled);
 
-    toggleChatBoxBtn.click(() => {
-        chatbox.toggleClass('chatbox--is-visible');
-        if(chatbox.hasClass('chatbox--is-visible')) {
-            toggleChatBoxBtn.html('<i class="fas fa-chevron-down"></i>');
-        } else {
-            toggleChatBoxBtn.html('<i class="fas fa-chevron-up"></i>');
-        }
-    });
-
-    chatboxForm.submit(e => {
-        e.preventDefault();
-        const chatInput = $('.js-chatbox-input').val();
-        socket.emit('message', {from: socket.id, to: socket.id, message: chatInput})
-
-        chatboxForm.trigger('reset');
-    });
+    chatboxForm.submit(onChatFormSubmit);
     // =================================================================================================================
 }
 
+/**
+ *
+ * @param input
+ * @param role
+ */
 const createChatBubble = (input, role) => {
     let chat_area = document.querySelector('.js-chatbox-display.chatbox__display');
 
@@ -84,6 +57,65 @@ const createChatBubble = (input, role) => {
     chat_area.scrollTop = chat_area.scrollHeight;
 }
 
+/**
+ *
+ * @param sender
+ * @param message
+ */
+const onMessage = ({sender, message}) => {
+    if (sender === socket.id) createChatBubble(message.text, 'sender');
+    else createChatBubble(message.text, 'receiver');
+}
 
+/**
+ *
+ * @param adminId
+ */
+const onAdminConnected = adminId => {
+    socket.emit('adminConnected', adminId);
 
-$(document).on('load', load());
+    if (!chatInitiated) {
+        chatInitiated = !chatInitiated;
+
+        chatboxMsgDisplay.find('p').remove();
+        chatboxForm.find('input').prop('disabled', false);
+        chatboxForm.find('button').prop('disabled', false);
+    }
+}
+
+/**
+ *
+ */
+const  onToggleChatBoxBtnClick = () => {
+    socket.emit('requestAssistance');
+
+    setTimeout(() => {
+        createChatBubble('Please wait a moment...', 'receiver');
+    }, 800);
+}
+
+/**
+ *
+ */
+const onToggleChatBoxBtnToggled = () => {
+    chatbox.toggleClass('chatbox--is-visible');
+    if(chatbox.hasClass('chatbox--is-visible')) {
+        toggleChatBoxBtn.html('<i class="fas fa-chevron-down"></i>');
+    } else {
+        toggleChatBoxBtn.html('<i class="fas fa-chevron-up"></i>');
+    }
+}
+
+/**
+ *
+ * @param e
+ */
+const onChatFormSubmit = e => {
+    e.preventDefault();
+    const chatInput = $('.js-chatbox-input').val();
+    socket.emit('message', {from: socket.id, to: socket.id, message: chatInput})
+
+    chatboxForm.trigger('reset');
+}
+
+$(document).ready(onLoad);

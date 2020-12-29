@@ -22,6 +22,7 @@ const socket = io('/Admins'); // Connects to Admins namespace
 
 // CONSTANTS ============================
 const toast = document.querySelector("el-toast");
+const adminRooms = ['admin1', 'admin2', 'admin3',];
 
 // VARIABLES ============================
 let user_cells = $('.msg');
@@ -33,142 +34,261 @@ let selected_client;
 /**
  * Handles the document loaded event.
  */
-const load = () => {
-    socket.on('clientUpdate', clientList => {
-       let parsedClientList = JSONParseMap(clientList);
-       if (parsedClientList.size !== 0) {
-           let parsedClientListIds = Array.from(parsedClientList.keys());
+const onLoad = () => {
 
-           // Selects the client list container
-           let modal1_body = $('#exampleModal').find('.modal-body');
+    let rand = getRandomInt(2);
 
-           // Resets it
-           modal1_body.html('');
+    socket.emit('adminLoggedOn', adminRooms[rand]);
 
-           parsedClientListIds.forEach(id => {
-               let client = parsedClientList.get(id);
+    console.log('Joined Room', adminRooms[rand]);
 
-               if (client.state === 'waiting') {
-                   modal1_body.prepend(
-                       $(`<div>
-                            <button class="btn btn-outline-success w-100" id="${id}">Client-${id}</button>
-                        </div>`)
+    socket.on('roomListUpdate', roomList => {
+        const parsedRoomList = JSONParseMap(roomList);
 
-                           // Handles the client select button click event
-                           .click(e => {
-                               $(e.target).remove();
-                               checkUsers();
-                               newUserCell(id);
-                           })
-                   );
-               }
-           })
-       }
-
-        checkUsers();
+        adminRooms.forEach(id => {
+           let admins = parsedRoomList.get(id);
+           if (admins !== undefined) console.log(id, admins);
+        });
     });
 
-    socket.on('adminUpdate', adminList => {
-        // Selects the admin list container
-        let modal2_body = $('#staticBackdrop').find('.modal-body');
+    // List of events
+    socket.on('clientUpdate', onClientUpdate);
 
-        // Resets it
-        modal2_body.html('');
+    socket.on('adminUpdate', onAdminUpdate);
 
-        // For each admin in the list create a field contains a button
-        //  - Fills the button with admin id
-        //  - Sets the button's click event with a function that sends an invitation to the admin
-        adminList.forEach(admin => {
-            if (admin !== socket.id) {
-                modal2_body.prepend(
-                    $(`<div>
-                        <button class="btn btn-outline-success w-100" id="${admin}">Admin-${admin}</button>
-                    </div>`).click(() => {
-                        socket.emit('inviteSent', {from: socket.id, to: admin, clientId: selected_client});
-                    })
-                );
-            }
-        })
-    })
+    socket.on('chatLogUpdate', onChatLogUpdate);
 
-    socket.on('chatLogUpdate', chatLog => {
-        const chatAreaMain = $('.chat-area-main');
+    socket.on('inviteReceived', onInviteReceived);
 
-        chatAreaMain.html('');
+    socket.on('inviteAccepted', onInviteAccepted);
 
-        chatLog.forEach(message => {
-            if (message.from === socket.id) createChatBubble(message.message, 'sender');
-            else createChatBubble(message.message, 'receiver');
-        })
-    })
+    socket.on('inviteDeclined', onInviteDeclined);
 
-    socket.on('inviteReceived', ({from, clientId}) => {
-        // Publish a toast notification
-        let idtoast = toast.publish({
-            type: "info",
-            description: `Admin-${from} invited you to a conversation`,
-            timeout: 0,
-            actions: [
-                {
-                    title: "ACCEPT",
-                    onClick: () => {
-                        // Removes the toast notification
-                        // Sends the confirmation
-                        // Creates a new user cell
-                        toast.remove(idtoast);
-                        socket.emit('inviteAccepted', {to: from, clientId: clientId});
-                        newUserCell(clientId);
-                    }
-                },
-                {
-                    title: "DECLINE",
-                    onClick: () => {
-                        // Removes the toast notification
-                        // Sends the invitation decline
-                        toast.remove(idtoast);
-                        socket.emit('inviteDeclined', {to: from, clientId: clientId});
-                    }
-                }
-            ]
-        });
-    })
+    socket.on('message', onMessage);
 
-    socket.on('inviteAccepted', message => processInviteResponse(message, "info"));
-
-    socket.on('inviteDeclined', message => processInviteResponse(message, "danger"));
-
-    socket.on('message', ({sender, message, roomId}) => {
-        if (roomId === selected_client) {
-            if (sender === socket.id) createChatBubble(message, 'sender');
-            else createChatBubble(message, 'receiver');
-        }
-    });
-
-    socket.on('clientDisconnect', id => {
-        toast.publish({
-            type: "info",
-            description: `Client-${id} has disconnected!`,
-            timeout: 8000
-        });
-
-        $(`#${id}`).removeClass('online');
-    })
+    socket.on('clientDisconnect', onClientDisconnect);
 
     // =================================================================================================================
 
     // Sets active once a user cell is clicked
-    user_cells.click(e => userCellClicked(e));
+    user_cells.click(userCellClicked);
 
-    $('.chat-area-footer form').submit(e => {
-        e.preventDefault();
-        const input_text = $(e.target).find('input').val();
-        socket.emit('message', {from: socket.id, to: selected_client, message: input_text});
-        $(e.target).trigger('reset');
-    })
+    $('.chat-area-footer form').submit(onFormSubmit)
 
     checkUsers();
 }
 
+function getRandomInt(max) {
+    return Math.floor(Math.random() * Math.floor(max));
+}
+
+// EVENT HANDLERS
+/**
+ *
+ * @param clientList
+ */
+const onClientUpdate = clientList => {
+    let parsedClientList = JSONParseMap(clientList);
+    if (parsedClientList.size !== 0) {
+        let parsedClientListIds = Array.from(parsedClientList.keys());
+
+        // Selects the client list container
+        let modal1_body = $('#exampleModal').find('.modal-body');
+
+        // Resets it
+        modal1_body.html('');
+
+        parsedClientListIds.forEach(id => {
+            let client = parsedClientList.get(id);
+
+            if (client.state === 'waiting') {
+                modal1_body.prepend(
+                    $(`<div>
+                            <button class="btn btn-outline-success w-80" id="${id}">Client-${id}</button>
+                            <button class="btn btn-outline-success w-20" id="${id}"><i class="fas fa-forward"></i></button>
+                        </div>`)
+
+                        // Handles the client select button click event
+                        .click(e => {
+                            $(e.target).remove();
+                            checkUsers();
+                            newUserCell(id);
+                        })
+                );
+            }
+        })
+    }
+
+    checkUsers();
+}
+
+/**
+ *
+ * @param adminList
+ */
+const onAdminUpdate = adminList => {
+    // Selects the admin list container
+    let modal2_body = $('#staticBackdrop').find('.modal-body');
+
+    // Resets it
+    modal2_body.html('');
+
+    // For each admin in the list create a field contains a button
+    //  - Fills the button with admin id
+    //  - Sets the button's click event with a function that sends an invitation to the admin
+    adminList.forEach(admin => {
+        if (admin !== socket.id) {
+            modal2_body.prepend(
+                $(`<div>
+                        <button class="btn btn-outline-success w-100" id="${admin}">Admin-${admin}</button>
+                    </div>`).click(() => {
+                    socket.emit('inviteSent', {from: socket.id, to: admin, clientId: selected_client});
+                })
+            );
+        }
+    })
+}
+
+/**
+ *
+ * @param chatLog
+ */
+const onChatLogUpdate = chatLog => {
+    const chatAreaMain = $('.chat-area-main');
+
+    chatAreaMain.html('');
+
+    chatLog.forEach(message => {
+        if (message.from === socket.id) createChatBubble(message.message, 'sender');
+        else createChatBubble(message.message, 'receiver');
+    })
+}
+
+/**
+ *
+ * @param from
+ * @param clientId
+ */
+const onInviteReceived = ({from, clientId}) => {
+    // Publish a toast notification
+    let idtoast = toast.publish({
+        type: "info",
+        description: `Admin-${from} invited you to a conversation`,
+        timeout: 0,
+        actions: [
+            {
+                title: "ACCEPT",
+                onClick: () => {
+                    // Removes the toast notification
+                    // Sends the confirmation
+                    // Creates a new user cell
+                    toast.remove(idtoast);
+                    socket.emit('inviteAccepted', {to: from, clientId: clientId});
+                    newUserCell(clientId);
+                }
+            },
+            {
+                title: "DECLINE",
+                onClick: () => {
+                    // Removes the toast notification
+                    // Sends the invitation decline
+                    toast.remove(idtoast);
+                    socket.emit('inviteDeclined', {to: from, clientId: clientId});
+                }
+            }
+        ]
+    });
+}
+
+/**
+ *
+ * @param message
+ * @returns {*}
+ */
+const onInviteAccepted = message => processInviteResponse(message, "info");
+
+/**
+ *
+ * @param message
+ * @returns {*}
+ */
+const onInviteDeclined = message => processInviteResponse(message, "danger");
+
+/**
+ *
+ * @param sender
+ * @param message
+ * @param roomId
+ */
+const onMessage = ({sender, message, roomId}) => {
+    if (roomId === selected_client) {
+        if (sender === socket.id) createChatBubble(message, 'sender');
+        else createChatBubble(message, 'receiver');
+    }
+}
+
+/**
+ *
+ * @param id
+ */
+const onClientDisconnect = id => {
+    toast.publish({
+        type: "info",
+        description: `Client-${id} has disconnected!`,
+        timeout: 8000
+    });
+
+    $(`#${id}`).removeClass('online');
+}
+
+/**
+ *
+ * @param e
+ */
+const onFormSubmit = e => {
+    e.preventDefault();
+    const input_text = $(e.target).find('input').val();
+    socket.emit('message', {from: socket.id, to: selected_client, message: input_text});
+    $(e.target).trigger('reset');
+}
+
+/**
+ * Handles click event on user cell.
+ * @param {Event} e Event object
+ */
+const userCellClicked = e => {
+    const active_user_cell = $('.msg.active');
+    active_user_cell.removeClass('active');
+    let chat_title;
+    let event_target;
+
+    if($(e.target).hasClass('msg')) {
+        event_target =  $(e.target);
+        event_target.addClass('active');
+        chat_title = event_target.find('.msg-username').html();
+        selected_client = e.target.id;
+    }
+    else {
+        event_target = user_cells.has($(e.target))
+        event_target.addClass('active');
+        chat_title = event_target.find('.msg-username').html();
+        selected_client = event_target.prop('id');
+    }
+
+    console.log(selected_client);
+
+    socket.emit('clientSwitched', selected_client);
+
+    $('.chat-area-main').html('');
+    $('.chat-area-title').html(chat_title);
+}
+
+/**
+ *
+ * @param message
+ * @param type
+ * @returns {*}
+ */
 const processInviteResponse = (message, type) => toast.publish({
     type: type,
     description: message,
@@ -223,37 +343,6 @@ const newUserCell = client_id => {
 }
 
 /**
- * Handles click event on user cell.
- * @param {Event} e Event object
- */
-const userCellClicked = e => {
-    const active_user_cell = $('.msg.active');
-    active_user_cell.removeClass('active');
-    let chat_title;
-    let event_target;
-
-    if($(e.target).hasClass('msg')) {
-        event_target =  $(e.target);
-        event_target.addClass('active');
-        chat_title = event_target.find('.msg-username').html();
-        selected_client = e.target.id;
-    }
-    else {
-        event_target = user_cells.has($(e.target))
-        event_target.addClass('active');
-        chat_title = event_target.find('.msg-username').html();
-        selected_client = event_target.prop('id');
-    }
-
-    console.log(selected_client);
-
-    socket.emit('clientSwitched', selected_client);
-
-    $('.chat-area-main').html('');
-    $('.chat-area-title').html(chat_title);
-}
-
-/**
  * Creates a chat bubble.
  * @param {String} input Text message.
  * @param {String} role receiver or sender?
@@ -303,4 +392,4 @@ const createChatBubble = (input, role) => {
 const { JSONParseMap } = require('../../utils/mapUtitls');
 
 
-$(document).on('load', load());
+$(document).ready(onLoad);
