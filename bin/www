@@ -167,7 +167,13 @@ adminWorkspace.on('connection', socket => {
       let meetingRoom = getMeetingRoom(clientId);
 
       client.getReps().forEach(rep => {
-        client.removeRep(rep);
+        if (rep !== to){
+          adminWorkspace.to(rep).emit('requestAccepted',{
+            type: type,
+            message: `Admin-${socket.id} has accepted your request ${purpose}`});
+
+        }
+
         adminWorkspace.sockets.get(rep).leave(meetingRoom);
       });
 

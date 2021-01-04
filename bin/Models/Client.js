@@ -57,14 +57,29 @@ class Client {
    */
   getEmail() {return this.email;}
 
+  /**
+   *
+   */
   getSocketId() {return this.socketId;}
 
+  /**
+   *
+   */
   getUsername() {return this.username;}
 
+  /**
+   *
+   */
   getProblem() {return this.problem;}
 
+  /**
+   *
+   */
   getReps() {return this.reps;}
 
+  /**
+   *
+   */
   getState() {return this.state;}
 }
 

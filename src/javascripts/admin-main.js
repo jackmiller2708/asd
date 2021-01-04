@@ -68,6 +68,10 @@ const onLoad = () => {
 
     $('.chat-area-footer form').on('submit', onFormSubmit);
 
+    if (selected_client === undefined) {
+        $('.user-settings').hide();
+    }
+
     checkUsers();
 }
 
@@ -87,7 +91,7 @@ function getRandomInt(max) {
  */
 const onClientUpdate = clientList => {
     let parsedClientList = JSONParseMap(clientList);
-
+    console.log(parsedClientList);
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
 
@@ -313,7 +317,39 @@ const onRequestReceived = ({from, client, type}) => {
  * @param message
  * @returns {*}
  */
-const onRequestAccepted = message => processRequestResponse(message, "info");
+const onRequestAccepted = ({type, message}) => {
+    processRequestResponse(message, "info");
+
+    console.log(type);
+    if (type === "forward"){
+        if (selected_forward_client === selected_client) {
+            $(`[client-id="${selected_forward_client}"]`).remove();
+
+            let selectedClients = $('.conversation-area').find('.msg');
+
+            if (selectedClients.length !== 0) {
+                $(selectedClients[0]).trigger('click');
+            }
+            else {
+                $('.chat-area-main').html('');
+
+                $(`
+                    <div class="not-selected">
+                        <h1>Please select a client to start converse</h1>
+                    </div>`).appendTo($('.chat-area-main'));
+
+                $('.chat-area-title').html('(Not Selected)');
+
+                selected_client = undefined;
+                selected_forward_client = undefined;
+
+                $('.user-settings').hide();
+            }
+
+        }
+    }
+
+};
 
 /**
  *
@@ -392,7 +428,9 @@ const userCellClicked = e => {
         selected_client = event_target.attr('client-id');
     }
 
-    console.log(selected_client);
+    selected_forward_client = selected_client;
+
+    $('.user-settings').show();
 
     socket.emit('clientSwitched', selected_client);
 
@@ -408,7 +446,7 @@ const userCellClicked = e => {
  */
 const processRequestResponse = (message, type) => toast.publish({
     type: type,
-    description: message.message,
+    description: message,
     timeout: 8000
 });
 
