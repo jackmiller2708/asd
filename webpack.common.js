@@ -12,7 +12,10 @@ module.exports = {
         path: path.resolve(__dirname, 'public'),
         publicPath: '/',
     },plugins: [
-        new CleanWebpackPlugin(),
+        new CleanWebpackPlugin({
+            dry: true,
+            dangerouslyAllowCleanPatternsOutsideProject: true
+        }),
         new HtmlWebpackPlugin({
             template: "./src/templates/index.pug",
             filename: "../views/index.pug",

@@ -2,12 +2,14 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="4909c078-b657-4f42-baf0-331131712e30" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/templates/login.pug" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/bin/www" beforeDir="false" afterPath="$PROJECT_DIR$/bin/www" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/javascripts/admin-main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/javascripts/admin-main.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/javascripts/index-main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/javascripts/index-main.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webpack.prod.js" beforeDir="false" afterPath="$PROJECT_DIR$/webpack.prod.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/templates/admin.pug" beforeDir="false" afterPath="$PROJECT_DIR$/src/templates/admin.pug" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/views/admin.pug" beforeDir="false" afterPath="$PROJECT_DIR$/views/admin.pug" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/views/index.pug" beforeDir="false" afterPath="$PROJECT_DIR$/views/index.pug" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webpack.common.js" beforeDir="false" afterPath="$PROJECT_DIR$/webpack.common.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -17,8 +19,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="JavaScript File" />
         <option value="Pug File" />
+        <option value="JavaScript File" />
       </list>
     </option>
   </component>
@@ -62,7 +64,11 @@
       <updated>1609045398468</updated>
       <workItem from="1609045401934" duration="45093000" />
       <workItem from="1609121801939" duration="5387000" />
-      <workItem from="1609131706417" duration="12618000" />
+      <workItem from="1609131706417" duration="16195000" />
+      <workItem from="1609226685402" duration="10630000" />
+      <workItem from="1609381404255" duration="8444000" />
+      <workItem from="1609390077967" duration="1347000" />
+      <workItem from="1609572851950" duration="9706000" />
     </task>
     <servers />
   </component>

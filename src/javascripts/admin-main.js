@@ -12,7 +12,7 @@ import '@fortawesome/fontawesome-free/js/brands'
 import $ from 'jquery'
 
 // Bootstrap
-import 'bootstrap';
+import{ Modal } from 'bootstrap';
 
 // Toastify
 import '../../utils/toast/Toastify';
@@ -28,6 +28,8 @@ const adminRooms = ['admin1', 'admin2', 'admin3',];
 let user_cells = $('.msg');
 let modal_body = $('.modal-body');
 let selected_client;
+let selected_forward_client;
+let localRoomList = new Map();
 
 
 // FUNCTIONS ============================
@@ -41,15 +43,6 @@ const onLoad = () => {
     socket.emit('adminLoggedOn', adminRooms[rand]);
 
     console.log('Joined Room', adminRooms[rand]);
-
-    socket.on('roomListUpdate', roomList => {
-        const parsedRoomList = JSONParseMap(roomList);
-
-        adminRooms.forEach(id => {
-           let admins = parsedRoomList.get(id);
-           if (admins !== undefined) console.log(id, admins);
-        });
-    });
 
     // List of events
     socket.on('clientUpdate', onClientUpdate);
@@ -71,13 +64,18 @@ const onLoad = () => {
     // =================================================================================================================
 
     // Sets active once a user cell is clicked
-    user_cells.click(userCellClicked);
+    user_cells.each(el => el.on('click', userCellClicked));
 
-    $('.chat-area-footer form').submit(onFormSubmit)
+    $('.chat-area-footer form').on('submit', onFormSubmit);
 
     checkUsers();
 }
 
+/**
+ *
+ * @param max
+ * @returns {number}
+ */
 function getRandomInt(max) {
     return Math.floor(Math.random() * Math.floor(max));
 }
@@ -89,30 +87,46 @@ function getRandomInt(max) {
  */
 const onClientUpdate = clientList => {
     let parsedClientList = JSONParseMap(clientList);
+
+    console.log(parsedClientList);
+    // Selects the client list container
+    let modal1_body = $('#exampleModal').find('.modal-body');
+
+    // Resets it
+    modal1_body.html('');
+
     if (parsedClientList.size !== 0) {
         let parsedClientListIds = Array.from(parsedClientList.keys());
-
-        // Selects the client list container
-        let modal1_body = $('#exampleModal').find('.modal-body');
-
-        // Resets it
-        modal1_body.html('');
 
         parsedClientListIds.forEach(id => {
             let client = parsedClientList.get(id);
 
             if (client.state === 'waiting') {
                 modal1_body.prepend(
-                    $(`<div>
-                            <button class="btn btn-outline-success w-80" id="${id}">Client-${id}</button>
-                            <button class="btn btn-outline-success w-20" id="${id}"><i class="fas fa-forward"></i></button>
+                    $(`<div class="d-flex">
+                            <button
+                                class="btn btn-outline-success w-100 client-select"
+                                id="${slugify(client.email)}">
+                                    ${client.username} - ${client.email}
+                            </button>
+                            <button
+                                class="btn btn-outline-success flex-shrink-1 client-forward"
+                                client-id="${client.email}"
+                                title="Forward to another admin">
+                                    <i class="fas fa-forward"></i>
+                            </button>
                         </div>`)
 
                         // Handles the client select button click event
-                        .click(e => {
-                            $(e.target).remove();
-                            checkUsers();
-                            newUserCell(id);
+                        .on('click', e => {
+                            const target = $(e.target);
+
+                            if (target.hasClass('client-select')) {
+                                target.remove();
+                                checkUsers();
+                                newUserCell(client.username, client.email);
+                            }
+                            else onForwardBtnClicked(e);
                         })
                 );
             }
@@ -124,29 +138,118 @@ const onClientUpdate = clientList => {
 
 /**
  *
- * @param adminList
+ * @param roomList
  */
-const onAdminUpdate = adminList => {
+const onAdminUpdate = roomList => {
+    const parsedRoomList = JSONParseMap(roomList);
+
     // Selects the admin list container
     let modal2_body = $('#staticBackdrop').find('.modal-body');
+    let modal3_body = $('#adminStaticBackdrop').find('.modal-body');
 
     // Resets it
     modal2_body.html('');
+    modal3_body.html('');
 
-    // For each admin in the list create a field contains a button
-    //  - Fills the button with admin id
-    //  - Sets the button's click event with a function that sends an invitation to the admin
-    adminList.forEach(admin => {
-        if (admin !== socket.id) {
-            modal2_body.prepend(
-                $(`<div>
-                        <button class="btn btn-outline-success w-100" id="${admin}">Admin-${admin}</button>
-                    </div>`).click(() => {
-                    socket.emit('inviteSent', {from: socket.id, to: admin, clientId: selected_client});
-                })
-            );
+    const accordionContainer =  $(`
+        <div
+            class="accordion"
+            id="adminAccordion">
+        </div>`);
+
+    const adminForwardAccordionContainer =  $(`
+        <div
+            class="accordion"
+            id="adminForwardAccordion">
+        </div>`);
+
+    getAdminAccordionItems(accordionContainer, parsedRoomList, "A");
+    getAdminAccordionItems(adminForwardAccordionContainer, parsedRoomList, "F");
+
+    modal2_body.prepend(accordionContainer);
+    modal3_body.prepend(adminForwardAccordionContainer);
+}
+
+/**
+ *
+ * @param accordionContainer
+ * @param parsedRoomList
+ * @param mode
+ */
+const getAdminAccordionItems = (accordionContainer, parsedRoomList, mode) => {
+    adminRooms.forEach(id => {
+        let adminList = parsedRoomList.get(id);
+
+        if (adminList !== undefined) {
+            localRoomList.set(id, adminList);
+            let modeId = mode === "A" ? id : id + '-f';
+
+            const accordionItem = $(`<div class="accordion-item"></div>`);
+
+            const accordionItemHeader = $(`
+                <h2 class="accordion-header" id="${modeId}-Header">
+                    <button
+                        class="accordion-button collapsed"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#${modeId}"
+                        aria-expanded="false" aria-controls="${id}">
+                            Room ${id}
+                    </button>
+                </h2>
+            `);
+
+            const accordionItemBodyContainer = $(`
+                <div
+                    id="${modeId}"
+                    class="accordion-collapse collapse"
+                    aria-labelledby="${modeId}-Header"
+                    data-bs-parent="#adminAccordion">
+                </div>`);
+
+            const accordionItemBody = $(`<div class="accordion-body"></div>`);
+
+            accordionItem.appendTo(accordionContainer);
+            accordionItemHeader.appendTo(accordionItem);
+            accordionItemBodyContainer.appendTo(accordionItem);
+            accordionItemBody.appendTo(accordionItemBodyContainer);
+
+            // For each admin in the list create a field contains a button
+            //  - Fills the button with admin id
+            //  - Sets the button's click event with a function that sends an invitation or forward request to the admin
+            adminList.forEach(admin => {
+                if (admin !== socket.id) {
+                    accordionItemBody.prepend(
+                        $(`
+                            <div>
+                                <button class="btn btn-outline-success w-100" id="${mode === "A" ? admin : admin + '-f'}">Admin-${admin}</button>
+                            </div>`).on('click', () => {
+                                if (mode === "A")
+                                    socket.emit('inviteSent', {from: socket.id, to: admin, clientId: selected_client});
+                                else
+                                    socket.emit('clientForwarded', {to: admin, clientId: selected_forward_client})
+                        })
+                    );
+                }
+            });
+
+            if (accordionItemBody.find('button').length === 0) accordionItem.remove();
         }
-    })
+    });
+}
+
+/**
+ *
+ * @param e
+ */
+const onForwardBtnClicked = e => {
+    const waitListEl = document.getElementById('exampleModal');
+    const adminForwardListEl = document.getElementById('adminStaticBackdrop');
+    const waitListModal = Modal.getInstance(waitListEl);
+    const adminForwardListModal = Modal.getInstance(adminForwardListEl) || new Modal(adminForwardListEl, {backdrop: 'static'});
+    selected_forward_client = $(e.target).attr('client-id');
+    waitListModal.hide();
+    adminForwardListModal.show();
 }
 
 /**
@@ -169,7 +272,9 @@ const onChatLogUpdate = chatLog => {
  * @param from
  * @param clientId
  */
-const onInviteReceived = ({from, clientId}) => {
+const onInviteReceived = ({from, client}) => {
+    client = JSON.parse(client);
+
     // Publish a toast notification
     let idtoast = toast.publish({
         type: "info",
@@ -183,8 +288,8 @@ const onInviteReceived = ({from, clientId}) => {
                     // Sends the confirmation
                     // Creates a new user cell
                     toast.remove(idtoast);
-                    socket.emit('inviteAccepted', {to: from, clientId: clientId});
-                    newUserCell(clientId);
+                    socket.emit('inviteAccepted', {to: from, clientId: client.email});
+                    newUserCell(client.username, client.email);
                 }
             },
             {
@@ -193,7 +298,7 @@ const onInviteReceived = ({from, clientId}) => {
                     // Removes the toast notification
                     // Sends the invitation decline
                     toast.remove(idtoast);
-                    socket.emit('inviteDeclined', {to: from, clientId: clientId});
+                    socket.emit('inviteDeclined', {to: from, clientId: client.email});
                 }
             }
         ]
@@ -221,10 +326,16 @@ const onInviteDeclined = message => processInviteResponse(message, "danger");
  * @param roomId
  */
 const onMessage = ({sender, message, roomId}) => {
+
     if (roomId === selected_client) {
-        if (sender === socket.id) createChatBubble(message, 'sender');
+        if (sender === socket.id) {
+            createChatBubble(message, 'sender');
+            sender = "You";
+        }
         else createChatBubble(message, 'receiver');
     }
+
+    $(`#${slugify(selected_client)}`).find('.msg-message').html(`${sender}: ${message.text}`);
 }
 
 /**
@@ -234,7 +345,7 @@ const onMessage = ({sender, message, roomId}) => {
 const onClientDisconnect = id => {
     toast.publish({
         type: "info",
-        description: `Client-${id} has disconnected!`,
+        description: `Client (${id}) has disconnected!`,
         timeout: 8000
     });
 
@@ -247,8 +358,11 @@ const onClientDisconnect = id => {
  */
 const onFormSubmit = e => {
     e.preventDefault();
+
     const input_text = $(e.target).find('input').val();
+
     socket.emit('message', {from: socket.id, to: selected_client, message: input_text});
+
     $(e.target).trigger('reset');
 }
 
@@ -266,13 +380,13 @@ const userCellClicked = e => {
         event_target =  $(e.target);
         event_target.addClass('active');
         chat_title = event_target.find('.msg-username').html();
-        selected_client = e.target.id;
+        selected_client = $(e.target).attr('client-id');
     }
     else {
         event_target = user_cells.has($(e.target))
         event_target.addClass('active');
         chat_title = event_target.find('.msg-username').html();
-        selected_client = event_target.prop('id');
+        selected_client = event_target.attr('client-id');
     }
 
     console.log(selected_client);
@@ -312,32 +426,36 @@ const checkUsers = () => {
 
 /**
  * Creates a new user cell and initiates the conversation.
- * @param client_id The id of the selected client.
+ * @param username
+ * @param client_email The id of the selected client.
  */
-const newUserCell = client_id => {
+const newUserCell = (username, client_email) => {
     const new_user_cell =
-        $(`<div class="msg online" id="${client_id}">
-                                        <img class="msg-profile" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
-                                        <div class="msg-detail">
-                                            <div class="msg-username">Client-${client_id}</div>
-                                            <div class="msg-content">
-                                                <span class="msg-message">What time was our meet</span>
-                                                <span class="msg-date">20m</span>
-                                            </div>
-                                        </div>
-                                    </div>`)
+        $(`
+        <div class="msg online" id="${slugify(client_email)}" client-id="${client_email}">
+            <img
+                class="msg-profile"
+                src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
+            <div class="msg-detail">
+                <div class="msg-username">${username} - ${client_email}</div>
+                <div class="msg-content">
+                    <span class="msg-message">What time was our meet</span>
+                    <span class="msg-date">20m</span>
+                </div>
+            </div>
+        </div>`)
 
-    socket.emit('clientSelected', client_id);
+    socket.emit('clientSelected', client_email);
 
     $('.conversation-area').prepend(new_user_cell);
 
-    selected_client = client_id;
+    selected_client = client_email;
 
     user_cells = $('.msg');
 
     user_cells.off('click');
 
-    user_cells.click(e => userCellClicked(e));
+    user_cells.on('click', e => userCellClicked(e));
 
     new_user_cell.trigger('click');
 }
@@ -360,7 +478,9 @@ const createChatBubble = (input, role) => {
         } else {
             $(`<div class="chat-msg owner">
                 <div class="chat-msg-profile">
-                    <img class="chat-msg-img" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%281%29.png" alt="">
+                    <img
+                        class="chat-msg-img"
+                        src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%281%29.png" alt="">
                     <div class="chat-msg-date">Message sent ${input.time}</div>
                 </div>
                 <div class="chat-msg-content">
@@ -372,7 +492,9 @@ const createChatBubble = (input, role) => {
         if ($(last_message).hasClass('owner') || last_message === undefined) {
             $(`<div class="chat-msg">
                 <div class="chat-msg-profile">
-                    <img class="chat-msg-img" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
+                    <img
+                        class="chat-msg-img"
+                        src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
                     <div class="chat-msg-date">Message sent ${input.time}</div>
                 </div>
                 <div class="chat-msg-content">
@@ -391,5 +513,31 @@ const createChatBubble = (input, role) => {
 // EXTERNAL FUNCTIONS ====================
 const { JSONParseMap } = require('../../utils/mapUtitls');
 
+// Slugify a string
+function slugify(str)
+{
+    str = str.replace(/^\s+|\s+$/g, '');
 
-$(document).ready(onLoad);
+    // Make the string lowercase
+    str = str.toLowerCase();
+
+    // Remove accents, swap ñ for n, etc
+    var from = "ÁÄÂÀÃÅČÇĆĎÉĚËÈÊẼĔȆÍÌÎÏŇÑÓÖÒÔÕØŘŔŠŤÚŮÜÙÛÝŸŽáäâàãåčçćďéěëèêẽĕȇíìîïňñóöòôõøðřŕšťúůüùûýÿžþÞĐđßÆa·/_,:;";
+    var to   = "AAAAAACCCDEEEEEEEEIIIINNOOOOOORRSTUUUUUYYZaaaaaacccdeeeeeeeeiiiinnooooooorrstuuuuuyyzbBDdBAa------";
+    for (var i=0, l=from.length ; i<l ; i++) {
+        str = str.replace(new RegExp(from.charAt(i), 'g'), to.charAt(i));
+    }
+
+    // Remove invalid chars
+    str = str.replace(/[^a-z0-9 -]/g, '')
+    // Collapse whitespace and replace by -
+    .replace(/\s+/g, '-')
+    // Collapse dashes
+    .replace(/-+/g, '-');
+
+    return str;
+}
+
+$(function() {
+    onLoad();
+})

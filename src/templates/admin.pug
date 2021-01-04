@@ -4,7 +4,17 @@ block title
     title Admin
 
 block content
-    // Modal
+    // Modal Online Forward Admin
+    #adminStaticBackdrop.modal.fade(data-bs-backdrop='static' data-bs-keyboard='false' tabindex='-1' aria-labelledby='adminStaticBackdropLabel' aria-hidden='true')
+       .modal-dialog
+           .modal-content
+               .modal-header
+                   h5#adminStaticBackdropLabel.modal-title Forward To...
+                   button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+               .modal-body
+
+
+    // Modal Online Admin
     #staticBackdrop.modal.fade(data-bs-backdrop='static' data-bs-keyboard='false' tabindex='-1' aria-labelledby='staticBackdropLabel' aria-hidden='true')
         .modal-dialog
             .modal-content
@@ -13,7 +23,9 @@ block content
                     button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
                 .modal-body
 
-    // Modal
+
+
+    // Modal Wait List
     #exampleModal.modal.fade(tabindex='-1' aria-labelledby='exampleModalLabel' aria-hidden='true')
         .modal-dialog
             .modal-content

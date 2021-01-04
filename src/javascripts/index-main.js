@@ -34,9 +34,9 @@ const onLoad = () => {
     // =================================================================================================================
     toggleChatBoxBtn.one("click", onToggleChatBoxBtnClick);
 
-    toggleChatBoxBtn.click(onToggleChatBoxBtnToggled);
+    toggleChatBoxBtn.on('click', onToggleChatBoxBtnToggled);
 
-    chatboxForm.submit(onChatFormSubmit);
+    chatboxForm.on('submit', onChatFormSubmit);
     // =================================================================================================================
 }
 
@@ -45,13 +45,13 @@ const onLoad = () => {
  * @param input
  * @param role
  */
-const createChatBubble = (input, role) => {
+function createChatBubble(input, role) {
     let chat_area = document.querySelector('.js-chatbox-display.chatbox__display');
 
     $(`<div>
         <p class="chatbox__display-chat-${role === 'sender' ? 'sender' : 'receiver'}">
             ${input}
-        </p>   
+        </p>
     </div>`).appendTo(chatboxMsgDisplay);
 
     chat_area.scrollTop = chat_area.scrollHeight;
@@ -62,7 +62,7 @@ const createChatBubble = (input, role) => {
  * @param sender
  * @param message
  */
-const onMessage = ({sender, message}) => {
+function onMessage({sender, message}) {
     if (sender === socket.id) createChatBubble(message.text, 'sender');
     else createChatBubble(message.text, 'receiver');
 }
@@ -71,33 +71,109 @@ const onMessage = ({sender, message}) => {
  *
  * @param adminId
  */
-const onAdminConnected = adminId => {
+function onAdminConnected(adminId) {
     socket.emit('adminConnected', adminId);
+    let input = chatboxForm.find('input');
+    let button = chatboxForm.find('button');
 
     if (!chatInitiated) {
         chatInitiated = !chatInitiated;
 
+        input.prop('disabled', false);
+        button.prop('disabled', false);
+
         chatboxMsgDisplay.find('p').remove();
-        chatboxForm.find('input').prop('disabled', false);
-        chatboxForm.find('button').prop('disabled', false);
     }
 }
 
 /**
  *
  */
-const  onToggleChatBoxBtnClick = () => {
-    socket.emit('requestAssistance');
+function onToggleChatBoxBtnClick() {
+    let input = chatboxForm.find('input');
+    let button = chatboxForm.find('button');
+    let clientEmail, clientUsername, clientProblem;
 
-    setTimeout(() => {
-        createChatBubble('Please wait a moment...', 'receiver');
-    }, 800);
+    if (getCookie('email') === "") {
+        delay(() => createChatBubble('Chào bạn!'), 800)
+            .delay(() => createChatBubble('Trước khi bắt đầu thì cho mình xin một ít thông tin nhé :D'), 1000)
+            .delay(() => {
+                createChatBubble('Đầu tiên cho mình xin tên của bạn đi.');
+                createChatBubble('Vd: Huy, Linh...');
+
+                input.prop('disabled', false);
+                button.prop('disabled', false);
+
+                input.trigger('focus');
+
+                chatboxForm.on('submit', e => {
+                    e.preventDefault();
+
+                    clientUsername = input.val();
+                    createChatBubble(clientUsername, 'sender');
+                    setCookie('username', clientUsername, 1);
+
+                    delay(() => createChatBubble(`Tiếp đến là email của ${clientUsername}.`), 800);
+
+                    chatboxForm.trigger('reset');
+
+                    input.attr('type', 'email');
+
+                    chatboxForm.off('submit');
+
+                    chatboxForm.on('submit', e => {
+                        e.preventDefault();
+
+                        clientEmail = input.val();
+                        createChatBubble(clientEmail, 'sender');
+                        setCookie('email', clientEmail, 1);
+
+                        delay(() => createChatBubble(`Vậy hôm nay ${clientUsername} cần hỗ trợ về vấn đề nào?`), 800);
+
+                        chatboxForm.trigger('reset');
+
+                        input.attr('type', 'text');
+
+                        chatboxForm.off('submit');
+
+                        chatboxForm.on('submit', e => {
+                            e.preventDefault();
+
+                            clientProblem = input.val();
+                            createChatBubble(clientProblem, 'sender');
+                            setCookie('problem', clientProblem, 1);
+
+                            input.prop('disabled', true);
+                            button.prop('disabled', true);
+
+                            chatboxForm.trigger('reset');
+
+                            socket.emit('requestAssistance', {username: clientUsername, email: clientEmail});
+
+                            delay(() => createChatBubble('Xin chờ một tí để mình kết nối với nhân viên...'), 800)
+                                .delay(() => {
+                                    chatboxMsgDisplay.html('');
+                                    createChatBubble('Xin chờ một tí để mình kết nối với nhân viên...');
+                                }, 2000);
+
+                            chatboxForm.on('submit', onChatFormSubmit);
+                        });
+                    })
+                });
+            }, 800);
+    }
+    else {
+        delay(() => createChatBubble(`${getCookie('username')} chờ một tí để mình kết nối lại với nhân viên nha :D`), 800)
+        socket.emit('requestAssistance', {username: getCookie('username'), email: getCookie('email')});
+    }
+
+
 }
 
 /**
  *
  */
-const onToggleChatBoxBtnToggled = () => {
+function onToggleChatBoxBtnToggled() {
     chatbox.toggleClass('chatbox--is-visible');
     if(chatbox.hasClass('chatbox--is-visible')) {
         toggleChatBoxBtn.html('<i class="fas fa-chevron-down"></i>');
@@ -110,12 +186,61 @@ const onToggleChatBoxBtnToggled = () => {
  *
  * @param e
  */
-const onChatFormSubmit = e => {
+function onChatFormSubmit(e) {
+
     e.preventDefault();
+
     const chatInput = $('.js-chatbox-input').val();
-    socket.emit('message', {from: socket.id, to: socket.id, message: chatInput})
+
+    socket.emit('message', {from: socket.id, to: getCookie('email'), message: chatInput})
 
     chatboxForm.trigger('reset');
 }
 
-$(document).ready(onLoad);
+/**
+ *
+ * @param fn
+ * @param t
+ * @returns {*}
+ */
+function delay(fn, t) {
+    // private instance variables
+    let queue = [], self, timer;
+
+    function schedule(fn, t) {
+        timer = setTimeout(function() {
+            timer = null;
+            fn();
+            if (queue.length) {
+                let item = queue.shift();
+                schedule(item.fn, item.t);
+            }
+        }, t);
+    }
+    self = {
+        delay: function(fn, t) {
+            // if already queuing things or running a timer,
+            //   then just add to the queue
+            if (queue.length || timer) {
+                queue.push({fn: fn, t: t});
+            } else {
+                // no queue or timer yet, so schedule the timer
+                schedule(fn, t);
+            }
+            return self;
+        },
+        cancel: function() {
+            clearTimeout(timer);
+            queue = [];
+            return self;
+        }
+    };
+    return self.delay(fn, t);
+}
+
+// EXTERNAL FUNCTIONS ====================
+const { getCookie, setCookie } = require('../../utils/cookies');
+
+$(function() {
+    onLoad();
+})

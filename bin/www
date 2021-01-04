@@ -105,6 +105,9 @@ const setMessage = (from, roomId, text) => {
   });
 }
 
+const Client = require('./Models/Client');
+let clientConnections = new Map();
+
 
 // Reset Redis
 redisClient.get(clientListName, (err, data) => {
@@ -120,12 +123,8 @@ redisClient.get(clientListName, (err, data) => {
 // Admins logic ==========================================================
 
 adminWorkspace.on('connection', socket => {
-  console.log('Admin Connected!');
-
-  socket.on('adminLoggedOn', roomId => {
-    socket.join(roomId);
-
-    let adminRooms = adminWorkspace.adapter.rooms
+  const updateAdminList = () => {
+    let adminRooms = adminWorkspace.adapter.rooms;
     let roomIds = Array.from(adminRooms.keys());
     let roomMap = new Map();
 
@@ -133,29 +132,30 @@ adminWorkspace.on('connection', socket => {
       roomMap.set(id, Array.from(adminRooms.get(id)));
     })
 
-    adminWorkspace.emit('roomListUpdate', JSONStringifyMap(roomMap));
+    adminWorkspace.emit('adminUpdate', JSONStringifyMap(roomMap));
+  }
+
+  adminWorkspace.emit('clientUpdate', JSONStringifyMap(clientConnections));
+
+  //----------------------------------------------------------------
+  //----------------------------------------------------------------
+
+  // When an admin logs into the system
+  socket.on('adminLoggedOn', roomId => {
+    socket.join(roomId);
+    updateAdminList();
   });
 
-  // Get the client list when an admin is connected.
-  redisClient.get(clientListName, (err, data) => {
-    if (err) console.log(err);
-
-    if (data) {
-      adminWorkspace.emit('clientUpdate', data);
-    }
-    else {
-      adminWorkspace.emit('clientUpdate', JSONStringifyMap(new Map([])));
-    }
-  });
-
-  // Send the updated admin list.
-  adminWorkspace.emit('adminUpdate', adminWorkspace.adapter.rooms.has('admins') ? [...adminWorkspace.adapter.rooms.get('admins')] : []);
+  // When an admin forwarded a client to another admin
+  socket.on('clientForwarded', ({to, clientId}) => {
+    console.log(`Forwarded ${clientId} to Admin-${to}`);
+  })
 
   // When the admin sends a message.
   socket.on('inviteSent', ({from, to, clientId}) => {
 
     // Signal that the other receives the message
-    adminWorkspace.to(to).emit('inviteReceived', {from: from, clientId: clientId});
+    adminWorkspace.to(to).emit('inviteReceived', {from: from, client: JSON.stringify(clientConnections.get(clientId))});
   });
 
   // When the invitation is accepted.
@@ -171,12 +171,14 @@ adminWorkspace.on('connection', socket => {
   });
 
   // When a client is selected from the wait list
-  socket.on('clientSelected', clientId => {
-    const meetingRoom = getMeetingRoom(clientId);
+  socket.on('clientSelected', clientEmail => {
+    const meetingRoom = getMeetingRoom(clientEmail);
+
+    let client = clientConnections.get(clientEmail);
 
     socket.join(meetingRoom);
 
-    clientArea.to(clientId).emit('adminConnected', socket.id);
+    clientArea.to(client.socketId).emit('adminConnected', socket.id);
   });
 
   // When the admin switches clients
@@ -200,7 +202,7 @@ adminWorkspace.on('connection', socket => {
   // When an admin is disconnected.
   socket.on('disconnect', () => {
     console.log('Admin disconnected!');
-    adminWorkspace.emit('adminUpdate', adminWorkspace.adapter.rooms.has('admins') ? [...adminWorkspace.adapter.rooms.get('admins')] : []);
+    updateAdminList();
   })
 });
 
@@ -210,79 +212,39 @@ adminWorkspace.on('connection', socket => {
 clientArea.on('connection', socket => {
 
   // When a client requests assistance
-  socket.on('requestAssistance', () => {
-    let stringifiedList;
-
-    // Get and send an updated client list to admins
-    redisClient.get(clientListName, (err, data) => {
-      if (err) console.log(err);
-
-      // If there's a client list
-      if (data) {
-
-        // Get the list.
-        let clientList = JSONParseMap(data);
-
-        // Add new client.
-        clientList.set(socket.id, {state: 'waiting', rep: []});
-
-        // Stringify the list
-        stringifiedList = JSONStringifyMap(clientList);
-
-        // Save the list.
-        redisClient.set(clientListName, stringifiedList);
-
-        // Send the updated client list to all admins.
-        adminWorkspace.emit('clientUpdate', stringifiedList);
-      }
-
-      // If no client list
-      else {
-
-        // Create new list with the first client.
-        const listWithSingleClient = new Map([[socket.id, {state: 'waiting', rep: []}]]);
-
-        // Stringify the list
-        stringifiedList = JSONStringifyMap(listWithSingleClient);
-
-        // Save the list.
-        redisClient.set(clientListName, stringifiedList);
-
-        // Send the updated client list to all admins.
-        adminWorkspace.emit('clientUpdate', stringifiedList);
-      }
+  socket.on('requestAssistance', ({username, email}) => {
+    let client = new Client({
+      email: email,
+      socketId: socket.id,
+      username: username,
     });
-  })
+
+    clientConnections.set(client.email, client);
+
+     // Send the updated client list to all admins.
+     adminWorkspace.emit('clientUpdate', JSONStringifyMap(clientConnections));
+  });
 
   // When an admin is connected to the conversation.
   socket.on('adminConnected', adminId => {
-    const meetingRoom = getMeetingRoom(socket.id);
 
-    socket.join(meetingRoom);
+    clientConnections.forEach(client => {
+      if (client.socketId == socket.id) {
+        let meetingRoom = getMeetingRoom(client.email);
 
-    // Update the client list.
-    redisClient.get(clientListName, (err, data) => {
-      if (err) console.log(err);
+        socket.join(meetingRoom);
 
-      if (data) {
-        let clientList = JSONParseMap(data);
+        client.setState("chatting");
 
-        let clientProperties = clientList.get(socket.id);
+        client.addRep(adminId);
 
-        clientProperties.state = 'chatting';
-        clientProperties.rep.push(adminId);
-
-        clientList.set(socket.id, clientProperties);
-
-        let stringifiedList = JSONStringifyMap(clientList);
-
-        redisClient.set(clientListName, stringifiedList);
-
-        adminWorkspace.emit('clientUpdate', stringifiedList);
-
-        setMessage("Bot", socket.id, `--- Admin-${adminId} is connected ---`);
+        setMessage("Bot", client.email, `--- Admin-${adminId} is connected ---`);
       }
-    })
+    });
+
+    let stringifiedList = JSONStringifyMap(clientConnections);
+
+    adminWorkspace.emit('clientUpdate', stringifiedList);
   });
 
   // When the client receives a message.
@@ -290,26 +252,21 @@ clientArea.on('connection', socket => {
 
   // When a client is disconnected
   socket.on('disconnect', () => {
-    redisClient.get(clientListName, (err, data) => {
-      if (err) console.log(err);
+    clientConnections.forEach(client => {
+      if (client.socketId == socket.id) {
+        clientConnections.delete(client.email);
 
-      if (data) {
-        let clientList = JSONParseMap(data);
-
-        clientList.delete(socket.id);
-
-        const stringifiedList = JSONStringifyMap(clientList);
-
-        if (clientList.size > 0) redisClient.set(clientListName, stringifiedList);
-        else redisClient.del(clientListName);
+        const stringifiedList = JSONStringifyMap(clientConnections);
 
         adminWorkspace.emit('clientUpdate', stringifiedList);
 
-        adminWorkspace.to(getMeetingRoom(socket.id)).emit('clientDisconnect', socket.id);
+        client.reps.forEach(rep => {
+          adminWorkspace.to(rep).emit('clientDisconnect', client.username);
+        });
 
-        setMessage('Bot', socket.id, `--- Client-${socket.id} has been disconnected! ---`);
+        setMessage('Bot', client.email, `--- ${client.username} has left ---`);
       }
-    })
+    });
   });
 })
 
