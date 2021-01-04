@@ -46,8 +46,15 @@ class Client {
    */
   addRep(rep) {this.reps.push(rep);}
 
+  /**
+   *
+   * @param {String} rep
+   */
   removeRep(rep) {this.reps.splice(this.reps.indexOf(rep), 1);}
 
+  /**
+   *
+   */
   getEmail() {return this.email;}
 
   getSocketId() {return this.socketId;}

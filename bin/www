@@ -146,28 +146,45 @@ adminWorkspace.on('connection', socket => {
     updateAdminList();
   });
 
-  // When an admin forwarded a client to another admin
-  socket.on('clientForwarded', ({to, clientId}) => {
-    console.log(`Forwarded ${clientId} to Admin-${to}`);
-  })
-
   // When the admin sends a message.
-  socket.on('inviteSent', ({from, to, clientId}) => {
-
+  socket.on('requestSent', ({to, clientId, type}) => {
     // Signal that the other receives the message
-    adminWorkspace.to(to).emit('inviteReceived', {from: from, client: JSON.stringify(clientConnections.get(clientId))});
+    adminWorkspace.to(to).emit('requestReceived', {from: socket.id, client: JSON.stringify(clientConnections.get(clientId)), type: type});
   });
 
   // When the invitation is accepted.
-  socket.on('inviteAccepted', ({to, clientId}) => {
-    adminWorkspace.to(to).emit('inviteAccepted',
-        `Admin-${socket.id} has accepted your invitation to join room ${getMeetingRoom(clientId)}`);
+  socket.on('requestAccepted', ({to, clientId, type}) => {
+    let purpose = type === 'forward' ?
+      `to forward to the requested client ${clientId}` :
+      `to join room ${getMeetingRoom(clientId)}`;
+
+    adminWorkspace.to(to).emit('requestAccepted',{
+      type: type,
+      message: `Admin-${socket.id} has accepted your request ${purpose}`});
+
+    if (type === 'forward') {
+      let client = clientConnections.get(clientId);
+      let meetingRoom = getMeetingRoom(clientId);
+
+      client.getReps().forEach(rep => {
+        client.removeRep(rep);
+        adminWorkspace.sockets.get(rep).leave(meetingRoom);
+      });
+
+      client.addRep(socket.id);
+    }
   });
 
   // When the invitation is declined.
-  socket.on('inviteDeclined', ({to, clientId}) => {
-    adminWorkspace.to(to).emit('inviteDeclined',
-        `Admin-${socket.id} has declined your invitation to join room ${getMeetingRoom(clientId)}`);
+  socket.on('requestDeclined', ({to, clientId, type}) => {
+    let purpose = type === 'forward' ?
+      `to forward to the requested client ${clientId}` :
+      `to join room ${getMeetingRoom(clientId)}`;
+
+    adminWorkspace.to(to).emit('requestDeclined',{
+      type: type,
+      message: `Admin-${socket.id} has declined your request ${purpose}`
+    });
   });
 
   // When a client is selected from the wait list

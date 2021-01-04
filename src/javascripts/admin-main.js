@@ -51,11 +51,11 @@ const onLoad = () => {
 
     socket.on('chatLogUpdate', onChatLogUpdate);
 
-    socket.on('inviteReceived', onInviteReceived);
+    socket.on('requestReceived', onRequestReceived);
 
-    socket.on('inviteAccepted', onInviteAccepted);
+    socket.on('requestAccepted', onRequestAccepted);
 
-    socket.on('inviteDeclined', onInviteDeclined);
+    socket.on('requestDeclined', onRequestDeclined);
 
     socket.on('message', onMessage);
 
@@ -88,7 +88,6 @@ function getRandomInt(max) {
 const onClientUpdate = clientList => {
     let parsedClientList = JSONParseMap(clientList);
 
-    console.log(parsedClientList);
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
 
@@ -225,9 +224,9 @@ const getAdminAccordionItems = (accordionContainer, parsedRoomList, mode) => {
                                 <button class="btn btn-outline-success w-100" id="${mode === "A" ? admin : admin + '-f'}">Admin-${admin}</button>
                             </div>`).on('click', () => {
                                 if (mode === "A")
-                                    socket.emit('inviteSent', {from: socket.id, to: admin, clientId: selected_client});
+                                    socket.emit('requestSent', {to: admin, clientId: selected_client, type: "invite"});
                                 else
-                                    socket.emit('clientForwarded', {to: admin, clientId: selected_forward_client})
+                                    socket.emit('requestSent', {to: admin, clientId: selected_forward_client, type: "forward"});
                         })
                     );
                 }
@@ -247,7 +246,8 @@ const onForwardBtnClicked = e => {
     const adminForwardListEl = document.getElementById('adminStaticBackdrop');
     const waitListModal = Modal.getInstance(waitListEl);
     const adminForwardListModal = Modal.getInstance(adminForwardListEl) || new Modal(adminForwardListEl, {backdrop: 'static'});
-    selected_forward_client = $(e.target).attr('client-id');
+    if ($(e.target).hasClass('btn')) selected_forward_client = $(e.target).attr('client-id');
+    else selected_forward_client = $(e.target).parent('.btn').attr('client-id',);
     waitListModal.hide();
     adminForwardListModal.show();
 }
@@ -272,13 +272,16 @@ const onChatLogUpdate = chatLog => {
  * @param from
  * @param clientId
  */
-const onInviteReceived = ({from, client}) => {
+const onRequestReceived = ({from, client, type}) => {
     client = JSON.parse(client);
+    let description = type === 'invite' ?
+        `Admin-${from} invited you to a conversation.` :
+        `Admin-${from} forwarded a client to you.`;
 
     // Publish a toast notification
     let idtoast = toast.publish({
         type: "info",
-        description: `Admin-${from} invited you to a conversation`,
+        description: description,
         timeout: 0,
         actions: [
             {
@@ -288,7 +291,7 @@ const onInviteReceived = ({from, client}) => {
                     // Sends the confirmation
                     // Creates a new user cell
                     toast.remove(idtoast);
-                    socket.emit('inviteAccepted', {to: from, clientId: client.email});
+                    socket.emit('requestAccepted', {to: from, clientId: client.email, type: type});
                     newUserCell(client.username, client.email);
                 }
             },
@@ -298,7 +301,7 @@ const onInviteReceived = ({from, client}) => {
                     // Removes the toast notification
                     // Sends the invitation decline
                     toast.remove(idtoast);
-                    socket.emit('inviteDeclined', {to: from, clientId: client.email});
+                    socket.emit('requestDeclined', {to: from, clientId: client.email, type: type});
                 }
             }
         ]
@@ -310,14 +313,14 @@ const onInviteReceived = ({from, client}) => {
  * @param message
  * @returns {*}
  */
-const onInviteAccepted = message => processInviteResponse(message, "info");
+const onRequestAccepted = message => processRequestResponse(message, "info");
 
 /**
  *
  * @param message
  * @returns {*}
  */
-const onInviteDeclined = message => processInviteResponse(message, "danger");
+const onRequestDeclined = message => processRequestResponse(message, "danger");
 
 /**
  *
@@ -403,9 +406,9 @@ const userCellClicked = e => {
  * @param type
  * @returns {*}
  */
-const processInviteResponse = (message, type) => toast.publish({
+const processRequestResponse = (message, type) => toast.publish({
     type: type,
-    description: message,
+    description: message.message,
     timeout: 8000
 });
 
