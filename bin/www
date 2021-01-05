@@ -108,18 +108,6 @@ const setMessage = (from, roomId, text) => {
 const Client = require('./Models/Client');
 let clientConnections = new Map();
 
-
-// Reset Redis
-redisClient.get(clientListName, (err, data) => {
-  if (err) console.log(err);
-
-  if (data){
-    redisClient.del(clientListName);
-
-    console.log('Clients key reset!');
-  }
-})
-
 // Admins logic ==========================================================
 
 adminWorkspace.on('connection', socket => {

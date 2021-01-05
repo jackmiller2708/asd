@@ -277,6 +277,7 @@ const onChatLogUpdate = chatLog => {
  * @param clientId
  */
 const onRequestReceived = ({from, client, type}) => {
+    console.log(client);
     client = JSON.parse(client);
     let description = type === 'invite' ?
         `Admin-${from} invited you to a conversation.` :
@@ -442,7 +443,6 @@ const userCellClicked = e => {
  *
  * @param message
  * @param type
- * @returns {*}
  */
 const processRequestResponse = (message, type) => toast.publish({
     type: type,
