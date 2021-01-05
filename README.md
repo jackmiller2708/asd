@@ -1,6 +1,6 @@
 # Live Chat
 
-## Table of contents
+## :clipboard: Table of contents
 - [Project Description](#project-description)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
@@ -8,8 +8,8 @@
   - [Project Initiation](#project-initiation)
 
 
-## Project Description
-### Note:
+## :orange_book: Project Description
+### :warning: Note:
 * This project utilizes webpack so all front-end scripts, stylesheets and template files are located in the `src` folder.
 * All project's common webpack configurations are contained within `webpack.common.js` file. (_please notify or consult me, [Jack](www.linkedin.com/in/jackmillerwebdeveloper), if you wish to modify the settings_).
 * Server file is located in the `bin` folder under the name `www`.
@@ -65,7 +65,7 @@
   + process request denied.
     - send notification back to requester.
 
-## Installation
+## :computer: Installation
 
 ### Prerequisites
 1. [node.js](https://nodejs.org/en/download/)
