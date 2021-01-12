@@ -57,8 +57,6 @@ let clientConnections =  new Map(),
     adminConnections = new Map();
 
 adminWorkspace.on('connection', socket => {
-  console.log('adminConnected');
-
   // When an admin logs into the system
   socket.on('adminLoggedOn', adminJSON => {
     let parsedAdminObj = JSON.parse(adminJSON);
@@ -200,26 +198,28 @@ clientArea.on('connection', socket => {
 
       oldClient.addSocketId(socket.id);
 
-      if (oldClient.state === 'offline') {
+      if (oldClient.getReps().length !== 0) {
+        if (oldClient.state === 'offline') {
 
-        oldClient.state = 'chatting';
+          oldClient.state = 'chatting';
 
-        oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
-      };
+          oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
+        };
 
-      socket.join(getMeetingRoom(email));
+        socket.join(getMeetingRoom(email));
 
-      redisClient.get(getMeetingRoom(email), (err, data) => {
+        redisClient.get(getMeetingRoom(email), (err, data) => {
 
-        if (err) {console.log(err);}
+          if (err) {console.log(err);}
 
-        if (data) {
+          if (data) {
 
-          let chatLog = JSON.parse(data);
+            let chatLog = JSON.parse(data);
 
-          clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
-        }
-      });
+            clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
+          }
+        });
+      }
     }
     else {
 
