@@ -29,7 +29,7 @@ const Client = require('./Models/Client');
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '3000');
+var port = normalizePort(process.env.PORT || '3001');
 app.set('port', port);
 
 /**
@@ -204,10 +204,10 @@ clientArea.on('connection', socket => {
 
         oldClient.state = 'chatting';
 
-        socket.join(getMeetingRoom(email));
-
         oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
       };
+
+      socket.join(getMeetingRoom(email));
 
       redisClient.get(getMeetingRoom(email), (err, data) => {
 

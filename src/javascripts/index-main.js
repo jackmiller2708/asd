@@ -29,7 +29,17 @@ let chatInitiated = false;
 const onLoad = () => {
     socket.on('adminConnected', onAdminConnected);
 
-    socket.on('chatLogUpdate', chatlog => chatlog.forEach(messageObj => onMessage({sender: messageObj.from, message: messageObj.message})));
+    socket.on('chatLogUpdate', chatlog => {
+        let input = chatboxForm.find('input');
+        let button = chatboxForm.find('button');
+
+        input.prop('disabled', false);
+        button.prop('disabled', false);
+
+        chatboxMsgDisplay.find('p').remove();
+
+        chatlog.forEach(messageObj => onMessage({sender: messageObj.from, message: messageObj.message}));
+    });
 
     socket.on('message', onMessage);
 
