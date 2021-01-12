@@ -92,7 +92,7 @@ adminWorkspace.on('connection', socket => {
 
     admin.addClient(client);
 
-    client.socketIdS.forEach(id => clientArea.to(id).emit('adminConnected', admin));
+    client.socketIds.forEach(id => clientArea.to(id).emit('adminConnected', admin));
   });
 
   socket.on('clientSwitched', newClientEmail => {
