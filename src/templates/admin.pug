@@ -4,6 +4,33 @@ block title
     title Admin
 
 block content
+    // Modal
+    #loginStaticBackdrop.modal.fade(data-bs-backdrop='static' data-bs-keyboard='false' tabindex='-1' aria-labelledby='loginStaticBackdropLabel' aria-hidden='true')
+        .modal-dialog
+            .modal-content
+                .modal-header
+                    h5#loginStaticBackdropLabel.modal-title Log In
+                .modal-body
+                    form#login-form
+                        .mb-3
+                            label.form-label(for='emailInput') Email address
+                            input#emailInput.form-control(type='email' aria-describedby='emailHelp' required)
+                            #emailHelp.form-text We&apos;ll never share your email with anyone else.
+                        .mb-3
+                            label.form-label(for='usernameInput') Username
+                            input#usernameInput.form-control(type='text' required)
+                        .mb-3
+                            label.form-label(for='roomSelect') Position
+                            select#roomSelect.form-select(aria-label='Default select example')
+                                option(selected='') -- Select a position
+                                option(value='0') Room1
+                                option(value='1') Room2
+                                option(value='2') Room3
+
+                        button.btn.btn-primary(type='submit') Submit
+
+
+
     // Modal Online Forward Admin
     #adminStaticBackdrop.modal.fade(data-bs-backdrop='static' data-bs-keyboard='false' tabindex='-1' aria-labelledby='adminStaticBackdropLabel' aria-hidden='true')
        .modal-dialog

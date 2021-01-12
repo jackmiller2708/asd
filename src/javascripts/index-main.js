@@ -29,6 +29,8 @@ let chatInitiated = false;
 const onLoad = () => {
     socket.on('adminConnected', onAdminConnected);
 
+    socket.on('chatLogUpdate', chatlog => chatlog.forEach(messageObj => onMessage({sender: messageObj.from, message: messageObj.message})));
+
     socket.on('message', onMessage);
 
     // =================================================================================================================
@@ -36,7 +38,8 @@ const onLoad = () => {
 
     toggleChatBoxBtn.on('click', onToggleChatBoxBtnToggled);
 
-    chatboxForm.on('submit', onChatFormSubmit);
+    if  (getCookie('username')) toggleChatBoxBtn.trigger('click');
+
     // =================================================================================================================
 }
 
@@ -63,7 +66,9 @@ function createChatBubble(input, role) {
  * @param message
  */
 function onMessage({sender, message}) {
-    if (sender === socket.id) createChatBubble(message.text, 'sender');
+    console.log(sender, getCookie('email'))
+
+    if (sender === getCookie('email')) createChatBubble(message.text, 'sender');
     else createChatBubble(message.text, 'receiver');
 }
 
@@ -104,12 +109,14 @@ function onToggleChatBoxBtnClick() {
                 input.prop('disabled', false);
                 button.prop('disabled', false);
 
-                input.trigger('focus');
+                input.focus();
 
                 chatboxForm.on('submit', e => {
                     e.preventDefault();
+                    console.log(input);
 
                     clientUsername = input.val();
+
                     createChatBubble(clientUsername, 'sender');
                     setCookie('username', clientUsername, 1);
 
@@ -156,6 +163,7 @@ function onToggleChatBoxBtnClick() {
                                     createChatBubble('Xin chờ một tí để mình kết nối với nhân viên...');
                                 }, 2000);
 
+                            chatboxForm.off('submit');
                             chatboxForm.on('submit', onChatFormSubmit);
                         });
                     })
@@ -163,11 +171,10 @@ function onToggleChatBoxBtnClick() {
             }, 800);
     }
     else {
-        delay(() => createChatBubble(`${getCookie('username')} chờ một tí để mình kết nối lại với nhân viên nha :D`), 800)
+        createChatBubble(`${getCookie('username')} chờ một tí để mình kết nối lại với nhân viên nha :D`);
         socket.emit('requestAssistance', {username: getCookie('username'), email: getCookie('email')});
+        chatboxForm.on('submit', onChatFormSubmit);
     }
-
-
 }
 
 /**
@@ -192,16 +199,16 @@ function onChatFormSubmit(e) {
 
     const chatInput = $('.js-chatbox-input').val();
 
-    socket.emit('message', {from: socket.id, to: getCookie('email'), message: chatInput})
+    socket.emit('message', {from: socket.id, to: getCookie('email'), text: chatInput})
 
     chatboxForm.trigger('reset');
 }
 
 /**
  *
- * @param fn
- * @param t
- * @returns {*}
+ * @param {function} fn what to do while waiting for t time.
+ * @param {Number} t time to wait for.
+ * @returns {function}
  */
 function delay(fn, t) {
     // private instance variables

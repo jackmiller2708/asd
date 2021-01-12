@@ -30,19 +30,13 @@ let modal_body = $('.modal-body');
 let selected_client;
 let selected_forward_client;
 let localRoomList = new Map();
-
+let localAdmin;
 
 // FUNCTIONS ============================
 /**
  * Handles the document loaded event.
  */
 const onLoad = () => {
-
-    let rand = getRandomInt(2);
-
-    socket.emit('adminLoggedOn', adminRooms[rand]);
-
-    console.log('Joined Room', adminRooms[rand]);
 
     // List of events
     socket.on('clientUpdate', onClientUpdate);
@@ -72,16 +66,49 @@ const onLoad = () => {
         $('.user-settings').hide();
     }
 
-    checkUsers();
-}
+    $.get('/session/get/admin', data => {
+        socket.emit('adminLoggedOn', data);
 
-/**
- *
- * @param max
- * @returns {number}
- */
-function getRandomInt(max) {
-    return Math.floor(Math.random() * Math.floor(max));
+        let adminData = JSON.parse(data);
+
+        console.log(adminData);
+
+        if (adminData.clients !== undefined) {
+            adminData.clients.forEach(client => {
+                newUserCell(client.username, client.email);
+            });
+        }
+    }).fail(() => {
+
+        let loginModal = new Modal(document.getElementById('loginStaticBackdrop'), {backdrop: 'static'});
+
+        loginModal.show();
+
+        $('#login-form').on('submit', e => {
+
+            e.preventDefault();
+
+            loginModal.hide();
+
+            const loggedInAdmin = JSON.stringify({
+                email: $('#emailInput').val(),
+                username: $('#usernameInput').val(),
+                position: $('#roomSelect').val(),
+            });
+
+            $.post('/session/set/admin', {data: loggedInAdmin}, data => console.log(data));
+
+            toast.publish({
+                type: "success",
+                description: `Welcome ${$('#usernameInput').val()}!`,
+                timeout: 8000
+            });
+
+            socket.emit('adminLoggedOn', loggedInAdmin);
+        });
+    });
+
+    checkUsers();
 }
 
 // EVENT HANDLERS
@@ -91,7 +118,7 @@ function getRandomInt(max) {
  */
 const onClientUpdate = clientList => {
     let parsedClientList = JSONParseMap(clientList);
-    console.log(parsedClientList);
+
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
 
@@ -143,8 +170,13 @@ const onClientUpdate = clientList => {
  *
  * @param roomList
  */
-const onAdminUpdate = roomList => {
-    const parsedRoomList = JSONParseMap(roomList);
+const onAdminUpdate = adminList => {
+    getAdminAccordion(adminList);
+}
+
+
+const getAdminAccordion = adminList => {
+    const parsedAdminList = JSONParseMap(adminList);
 
     // Selects the admin list container
     let modal2_body = $('#staticBackdrop').find('.modal-body');
@@ -166,8 +198,8 @@ const onAdminUpdate = roomList => {
             id="adminForwardAccordion">
         </div>`);
 
-    getAdminAccordionItems(accordionContainer, parsedRoomList, "A");
-    getAdminAccordionItems(adminForwardAccordionContainer, parsedRoomList, "F");
+    getAdminAccordionItems(accordionContainer, parsedAdminList, "A");
+    getAdminAccordionItems(adminForwardAccordionContainer, parsedAdminList, "F");
 
     modal2_body.prepend(accordionContainer);
     modal3_body.prepend(adminForwardAccordionContainer);
@@ -176,68 +208,79 @@ const onAdminUpdate = roomList => {
 /**
  *
  * @param accordionContainer
- * @param parsedRoomList
+ * @param parsedAdminList
  * @param mode
  */
-const getAdminAccordionItems = (accordionContainer, parsedRoomList, mode) => {
+const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
+
     adminRooms.forEach(id => {
-        let adminList = parsedRoomList.get(id);
 
-        if (adminList !== undefined) {
-            localRoomList.set(id, adminList);
-            let modeId = mode === "A" ? id : id + '-f';
+        const accordionItem = $(`<div class="accordion-item"></div>`);
 
-            const accordionItem = $(`<div class="accordion-item"></div>`);
+        let modeId = mode === "A" ? id : id + '-f';
 
-            const accordionItemHeader = $(`
-                <h2 class="accordion-header" id="${modeId}-Header">
-                    <button
-                        class="accordion-button collapsed"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#${modeId}"
-                        aria-expanded="false" aria-controls="${id}">
-                            Room ${id}
-                    </button>
-                </h2>
-            `);
+        const accordionItemHeader = $(`
+            <h2 class="accordion-header" id="${modeId}-Header">
+                <button
+                    class="accordion-button collapsed"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#${modeId}"
+                    aria-expanded="false" aria-controls="${id}">
+                        Room ${id}
+                </button>
+            </h2>
+        `);
 
-            const accordionItemBodyContainer = $(`
-                <div
-                    id="${modeId}"
-                    class="accordion-collapse collapse"
-                    aria-labelledby="${modeId}-Header"
-                    data-bs-parent="#adminAccordion">
-                </div>`);
+        const accordionItemBodyContainer = $(`
+            <div
+                id="${modeId}"
+                class="accordion-collapse collapse"
+                aria-labelledby="${modeId}-Header"
+                data-bs-parent="#adminAccordion">
+            </div>`);
 
-            const accordionItemBody = $(`<div class="accordion-body"></div>`);
+        const accordionItemBody = $(`<div class="accordion-body"></div>`);
 
-            accordionItem.appendTo(accordionContainer);
-            accordionItemHeader.appendTo(accordionItem);
-            accordionItemBodyContainer.appendTo(accordionItem);
-            accordionItemBody.appendTo(accordionItemBodyContainer);
+        accordionItem.appendTo(accordionContainer);
+        accordionItemHeader.appendTo(accordionItem);
+        accordionItemBodyContainer.appendTo(accordionItem);
+        accordionItemBody.appendTo(accordionItemBodyContainer);
 
-            // For each admin in the list create a field contains a button
-            //  - Fills the button with admin id
-            //  - Sets the button's click event with a function that sends an invitation or forward request to the admin
-            adminList.forEach(admin => {
-                if (admin !== socket.id) {
+        parsedAdminList.forEach(admin => {
+            let adminSocketId = admin.socketIds[0];
+
+            if (adminRooms[admin.position] === id) {
+                let room = localRoomList.get(id);
+
+                if (room !== undefined)  room.push(admin.email);
+                else localRoomList.set(id, [admin.email]);
+
+                if (!admin.socketIds.includes(socket.id)) {
                     accordionItemBody.prepend(
                         $(`
                             <div>
-                                <button class="btn btn-outline-success w-100" id="${mode === "A" ? admin : admin + '-f'}">Admin-${admin}</button>
+                                <button class="btn btn-outline-success w-100" id="${mode === "A" ? adminSocketId : adminSocketId + '-f'}">${admin.username}</button>
                             </div>`).on('click', () => {
                                 if (mode === "A")
-                                    socket.emit('requestSent', {to: admin, clientId: selected_client, type: "invite"});
+                                    socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_client, type: "invite"});
                                 else
-                                    socket.emit('requestSent', {to: admin, clientId: selected_forward_client, type: "forward"});
+                                    socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_forward_client, type: "forward"});
                         })
                     );
                 }
-            });
 
-            if (accordionItemBody.find('button').length === 0) accordionItem.remove();
-        }
+                else {
+                    localAdmin = admin;
+
+                    $.post('/session/set/admin', {data: JSON.stringify(localAdmin)}, data => console.log('localAdmin Updated!'));
+
+                    $.get('/session/get/admin', data => console.log(data));
+                }
+            }
+        });
+
+        if (accordionItemBody.find('button').length === 0) accordionItem.remove();
     });
 }
 
@@ -246,13 +289,18 @@ const getAdminAccordionItems = (accordionContainer, parsedRoomList, mode) => {
  * @param e
  */
 const onForwardBtnClicked = e => {
+
     const waitListEl = document.getElementById('exampleModal');
     const adminForwardListEl = document.getElementById('adminStaticBackdrop');
     const waitListModal = Modal.getInstance(waitListEl);
     const adminForwardListModal = Modal.getInstance(adminForwardListEl) || new Modal(adminForwardListEl, {backdrop: 'static'});
+
     if ($(e.target).hasClass('btn')) selected_forward_client = $(e.target).attr('client-id');
+
     else selected_forward_client = $(e.target).parent('.btn').attr('client-id',);
+
     waitListModal.hide();
+
     adminForwardListModal.show();
 }
 
@@ -265,10 +313,7 @@ const onChatLogUpdate = chatLog => {
 
     chatAreaMain.html('');
 
-    chatLog.forEach(message => {
-        if (message.from === socket.id) createChatBubble(message.message, 'sender');
-        else createChatBubble(message.message, 'receiver');
-    })
+    chatLog.forEach(message => onMessage({sender: message.from, message: message.message, roomId: selected_client}));
 }
 
 /**
@@ -277,11 +322,10 @@ const onChatLogUpdate = chatLog => {
  * @param clientId
  */
 const onRequestReceived = ({from, client, type}) => {
-    console.log(client);
-    client = JSON.parse(client);
+
     let description = type === 'invite' ?
-        `Admin-${from} invited you to a conversation.` :
-        `Admin-${from} forwarded a client to you.`;
+        `Admin ${from.username} invited you to a conversation.` :
+        `Admin ${from.username} forwarded a client to you.`;
 
     // Publish a toast notification
     let idtoast = toast.publish({
@@ -296,7 +340,7 @@ const onRequestReceived = ({from, client, type}) => {
                     // Sends the confirmation
                     // Creates a new user cell
                     toast.remove(idtoast);
-                    socket.emit('requestAccepted', {to: from, clientId: client.email, type: type});
+                    socket.emit('requestAccepted', {to: from, clientEmail: client.email, type: type});
                     newUserCell(client.username, client.email);
                 }
             },
@@ -306,7 +350,7 @@ const onRequestReceived = ({from, client, type}) => {
                     // Removes the toast notification
                     // Sends the invitation decline
                     toast.remove(idtoast);
-                    socket.emit('requestDeclined', {to: from, clientId: client.email, type: type});
+                    socket.emit('requestDeclined', {to: from, clientEmail: client.email, type: type});
                 }
             }
         ]
@@ -321,9 +365,11 @@ const onRequestReceived = ({from, client, type}) => {
 const onRequestAccepted = ({type, message}) => {
     processRequestResponse(message, "info");
 
-    console.log(type);
     if (type === "forward"){
         if (selected_forward_client === selected_client) {
+
+            console.log('forwarded')
+
             $(`[client-id="${selected_forward_client}"]`).remove();
 
             let selectedClients = $('.conversation-area').find('.msg');
@@ -368,14 +414,16 @@ const onRequestDeclined = message => processRequestResponse(message, "danger");
 const onMessage = ({sender, message, roomId}) => {
 
     if (roomId === selected_client) {
-        if (sender === socket.id) {
+
+        if (sender === localAdmin.email) {
             createChatBubble(message, 'sender');
             sender = "You";
         }
         else createChatBubble(message, 'receiver');
-    }
 
-    $(`#${slugify(selected_client)}`).find('.msg-message').html(`${sender}: ${message.text}`);
+    }
+    if (selected_client !== undefined)
+        $(`#${slugify(selected_client)}`).find('.msg-message').html(`${sender}: ${message.text}`);
 }
 
 /**
@@ -397,11 +445,12 @@ const onClientDisconnect = id => {
  * @param e
  */
 const onFormSubmit = e => {
+
     e.preventDefault();
 
     const input_text = $(e.target).find('input').val();
 
-    socket.emit('message', {from: socket.id, to: selected_client, message: input_text});
+    socket.emit('message', {from: socket.id, to: selected_client, text: input_text});
 
     $(e.target).trigger('reset');
 }

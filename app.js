@@ -4,6 +4,8 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
+const session = require('express-session');
+
 
 // Webpack Modules
 const webpack = require('webpack');
@@ -21,6 +23,7 @@ const compiler = webpack(config);
 // Routes
 const indexRouter = require('./routes/index');
 const adminsRouter = require('./routes/admins');
+const sessionRouter = require('./routes/session');
 
 const app = express();
 
@@ -30,6 +33,14 @@ app.use(
       publicPath: config.output.publicPath,
     })
 );
+
+
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+}));
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -43,6 +54,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/admin', adminsRouter);
+app.use('/session', sessionRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
