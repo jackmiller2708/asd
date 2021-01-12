@@ -92,7 +92,7 @@ adminWorkspace.on('connection', socket => {
 
     admin.addClient(client);
 
-    clientArea.to(client.getSocketIds()[0]).emit('adminConnected', admin);
+    client.socketIdS.forEach(id => clientArea.to(id).emit('adminConnected', admin));
   });
 
   socket.on('clientSwitched', newClientEmail => {
@@ -198,14 +198,16 @@ clientArea.on('connection', socket => {
 
       oldClient.addSocketId(socket.id);
 
-      if (oldClient.state === 'offline') {
-
-        oldClient.state = 'chatting';
-
-        oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
-      };
+      if (oldClient.state === 'offline') oldClient.state = 'waiting';
 
       if (oldClient.getReps().length !== 0) {
+
+        if (oldClient.state === 'offline') {
+
+          oldClient.state = 'chatting';
+
+          oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
+        };
 
         socket.join(getMeetingRoom(email));
 
@@ -223,6 +225,7 @@ clientArea.on('connection', socket => {
       }
 
       adminWorkspace.emit('clientUpdate', JSONStringifyMap(clientConnections));
+      console.log(clientConnections);
     }
     else {
 
