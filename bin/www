@@ -209,31 +209,28 @@ clientArea.on('connection', socket => {
 
       oldClient.addSocketId(socket.id);
 
-      if (oldClient.state === 'offline') {
+      if (oldClient.state === 'offline') oldClient.state = 'waiting';
 
-        oldClient.state = 'waiting';
+      if (oldClient.getReps().length !== 0) {
 
-        if (oldClient.getReps().length !== 0) {
+        oldClient.state = 'chatting';
 
-          oldClient.state = 'chatting';
+        oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin.email));
 
-          oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin));
-
-          socket.join(getMeetingRoom(email));
-
-          redisClient.get(getMeetingRoom(email), (err, data) => {
-
-            if (err) {console.log(err);}
-
-            if (data) {
-
-              let chatLog = JSON.parse(data);
-
-              clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
-            }
-          });
-        }
+        socket.join(getMeetingRoom(email));
       }
+
+      redisClient.get(getMeetingRoom(email), (err, data) => {
+
+        if (err) {console.log(err);}
+
+        if (data) {
+
+          let chatLog = JSON.parse(data);
+
+          clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
+        }
+      });
 
       adminWorkspace.emit('clientUpdate', stringify(clientConnections, replacer));
     }
