@@ -111,12 +111,33 @@ adminWorkspace.on('connection', socket => {
   socket.on('message', ({from, to, text}) => setMessage(from, to, text));
 
   socket.on('requestSent', ({to, clientEmail, type}) => {
+    let client = clientConnections.get(clientEmail);
 
-    adminWorkspace.to(to).emit('requestReceived', {
-      from: stringify(getAdmin(socket.id), replacer),
-      client: stringify(clientConnections.get(clientEmail), replacer),
-      type: type
-    });
+    let toAdmin = getAdmin(to);
+
+    if (type === "invite") {
+      if (client.reps.find(rep => rep.socketIds.includes(to)) === undefined) {
+        adminWorkspace.to(to).emit('requestReceived', {
+          from: stringify(getAdmin(socket.id), replacer),
+          client: stringify(client, replacer),
+          type: type
+        });
+      }
+
+      else {
+        adminWorkspace.to(socket.id).emit('requestDeclined' , {
+          type: type,
+          message: `Admin-${toAdmin.username} is already in chat room!`
+        });
+      }
+    }
+    else {
+      adminWorkspace.to(to).emit('requestReceived', {
+        from: stringify(getAdmin(socket.id), replacer),
+        client: stringify(client, replacer),
+        type: type
+      });
+    }
   });
 
   socket.on('requestAccepted', ({to, clientEmail, type}) => {
@@ -161,7 +182,7 @@ adminWorkspace.on('connection', socket => {
       `to forward to the requested client (${client.username})` :
       `to join chat with Client-${client.username}`;
 
-      toAdmin.socketIds.forEach(id => adminWorkspace.to(id).emit('requestAccepted', {
+      toAdmin.socketIds.forEach(id => adminWorkspace.to(id).emit('requestDeclined', {
         type: type,
         message: `Admin-${currentAdmin.username} has declined your request ${purpose}`
       }));
@@ -207,30 +228,40 @@ clientArea.on('connection', socket => {
 
     if (oldClient !== undefined) {
 
+      const meetingRoom = getMeetingRoom(email);
+
       oldClient.addSocketId(socket.id);
+
+      socket.join(meetingRoom);
 
       if (oldClient.state === 'offline') oldClient.state = 'waiting';
 
-      if (oldClient.getReps().length !== 0) {
+      console.log(adminWorkspace.adapter.rooms.get(meetingRoom));
+
+      if (adminWorkspace.adapter.rooms.get(meetingRoom) !== undefined) {
 
         oldClient.state = 'chatting';
 
-        oldClient.reps.forEach(admin => clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin.email));
+        adminWorkspace.adapter.rooms.get(meetingRoom).forEach(adminId => {
+          let admin = getAdmin(adminId);
 
-        socket.join(getMeetingRoom(email));
+          oldClient.reps.push(admin);
+
+          clientArea.to(oldClient.getSocketIds()[0]).emit('adminConnected', admin.email);
+        });
+
+        redisClient.get(getMeetingRoom(email), (err, data) => {
+
+          if (err) {console.log(err);}
+
+          if (data) {
+
+            let chatLog = JSON.parse(data);
+
+            clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
+          }
+        });
       }
-
-      redisClient.get(getMeetingRoom(email), (err, data) => {
-
-        if (err) {console.log(err);}
-
-        if (data) {
-
-          let chatLog = JSON.parse(data);
-
-          clientArea.to(socket.id).emit('chatLogUpdate', chatLog);
-        }
-      });
 
       adminWorkspace.emit('clientUpdate', stringify(clientConnections, replacer));
     }
@@ -263,7 +294,7 @@ clientArea.on('connection', socket => {
 
         const clientReps = client.getReps();
 
-        if (clientReps.length === 0 || clientReps.some(admin => admin.email !== connectedAdmin.email)) {
+        if (clientReps.length === 0 || clientReps.find(admin => admin.email === connectedAdmin.email) === undefined) {
 
           if (clientReps.length === 0) client.setState("chatting");
 

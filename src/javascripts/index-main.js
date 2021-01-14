@@ -91,8 +91,9 @@ function onAdminConnected(adminId) {
     let input = chatboxForm.find('input');
     let button = chatboxForm.find('button');
 
-    if (!chatInitiated) {
-        chatInitiated = !chatInitiated;
+    if (getCookie('initiated') === "") {
+
+        setCookie('initiated', 'true', 1);
 
         input.prop('disabled', false);
         button.prop('disabled', false);

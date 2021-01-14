@@ -347,6 +347,8 @@ const onRequestReceived = ({from, client, type}) => {
                     // Creates a new user cell
                     toast.remove(idtoast);
                     socket.emit('requestAccepted', {to: from.socketIds[0], clientEmail: client.email, type: type});
+
+                    if (type === 'forward') $(`[client-id="${client.email}"]`).remove();
                     newUserCell(client.username, client.email);
                 }
             },
@@ -409,7 +411,7 @@ const onRequestAccepted = ({type, message}) => {
  * @param message
  * @returns {*}
  */
-const onRequestDeclined = message => processRequestResponse(message, "danger");
+const onRequestDeclined = ({message}) => processRequestResponse(message, "danger");
 
 /**
  *
@@ -509,7 +511,7 @@ const processRequestResponse = (message, type) => toast.publish({
  * Checks if there are clients waiting
  */
 const checkUsers = () => {
-    modal_body.each(function(index) {
+    modal_body.each(function() {
         if($(this).find('button').length === 0) $(this).html(
             `<div class="alert alert-primary" role="alert">
             NO USERS
