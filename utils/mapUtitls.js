@@ -31,25 +31,7 @@ function reviver(key, value) {
     return value;
 }
 
-/**
- *
- * @returns {any}
- * @constructor
- */
-function JSONParseMap(map) {
-    return JSON.parse(map, reviver);
-}
-
-/**
- *
- * @returns {string}
- * @constructor
- */
-function JSONStringifyMap(map) {
-    return JSON.stringify(map, replacer);
-}
-
 module.exports = {
-    JSONParseMap,
-    JSONStringifyMap
+    replacer,
+    reviver
 };

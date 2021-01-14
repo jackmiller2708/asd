@@ -8,8 +8,9 @@ import '@fortawesome/fontawesome-free/js/regular'
 import '@fortawesome/fontawesome-free/js/brands'
 
 // LIBRARIES ============================
+
 // JQuery
-import $ from 'jquery'
+import $ from 'jquery';
 
 // Bootstrap
 import{ Modal } from 'bootstrap';
@@ -69,7 +70,7 @@ const onLoad = () => {
     $.get('/session/get/admin', data => {
         socket.emit('adminLoggedOn', data);
 
-        let adminData = JSON.parse(data);
+        let adminData = parse(data, reviver);
 
         console.log(adminData);
 
@@ -90,7 +91,7 @@ const onLoad = () => {
 
             loginModal.hide();
 
-            const loggedInAdmin = JSON.stringify({
+            const loggedInAdmin = stringify({
                 email: $('#emailInput').val(),
                 username: $('#usernameInput').val(),
                 position: $('#roomSelect').val(),
@@ -117,7 +118,9 @@ const onLoad = () => {
  * @param clientList
  */
 const onClientUpdate = clientList => {
-    let parsedClientList = JSONParseMap(clientList);
+    let parsedClientList = parse(clientList, reviver);
+
+    console.log(parsedClientList);
 
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
@@ -176,7 +179,7 @@ const onAdminUpdate = adminList => {
 
 
 const getAdminAccordion = adminList => {
-    const parsedAdminList = JSONParseMap(adminList);
+    const parsedAdminList = parse(adminList, reviver);
 
     // Selects the admin list container
     let modal2_body = $('#staticBackdrop').find('.modal-body');
@@ -273,7 +276,7 @@ const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
                 else {
                     localAdmin = admin;
 
-                    $.post('/session/set/admin', {data: JSON.stringify(localAdmin)}, data => console.log('localAdmin Updated!'));
+                    $.post('/session/set/admin', {data: stringify(localAdmin)}, data => console.log('localAdmin Updated!'));
 
                     $.get('/session/get/admin', data => console.log(data));
                 }
@@ -323,6 +326,9 @@ const onChatLogUpdate = chatLog => {
  */
 const onRequestReceived = ({from, client, type}) => {
 
+    from = parse(from, reviver);
+    client = parse(client, reviver);
+
     let description = type === 'invite' ?
         `Admin ${from.username} invited you to a conversation.` :
         `Admin ${from.username} forwarded a client to you.`;
@@ -340,7 +346,7 @@ const onRequestReceived = ({from, client, type}) => {
                     // Sends the confirmation
                     // Creates a new user cell
                     toast.remove(idtoast);
-                    socket.emit('requestAccepted', {to: from, clientEmail: client.email, type: type});
+                    socket.emit('requestAccepted', {to: from.socketIds[0], clientEmail: client.email, type: type});
                     newUserCell(client.username, client.email);
                 }
             },
@@ -350,7 +356,7 @@ const onRequestReceived = ({from, client, type}) => {
                     // Removes the toast notification
                     // Sends the invitation decline
                     toast.remove(idtoast);
-                    socket.emit('requestDeclined', {to: from, clientEmail: client.email, type: type});
+                    socket.emit('requestDeclined', {to: from.socketIds[0], clientEmail: client.email, type: type});
                 }
             }
         ]
@@ -601,7 +607,9 @@ const createChatBubble = (input, role) => {
 
 
 // EXTERNAL FUNCTIONS ====================
-const { JSONParseMap } = require('../../utils/mapUtitls');
+const { reviver } = require('../../utils/mapUtitls');
+
+const {parse, stringify} = require('flatted');
 
 // Slugify a string
 function slugify(str)

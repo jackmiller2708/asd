@@ -191,11 +191,17 @@ function onToggleChatBoxBtnClick() {
  *
  */
 function onToggleChatBoxBtnToggled() {
+
     chatbox.toggleClass('chatbox--is-visible');
+
     if(chatbox.hasClass('chatbox--is-visible')) {
+
         toggleChatBoxBtn.html('<i class="fas fa-chevron-down"></i>');
+
     } else {
+
         toggleChatBoxBtn.html('<i class="fas fa-chevron-up"></i>');
+
     }
 }
 
