@@ -67,46 +67,62 @@ const onLoad = () => {
         $('.user-settings').hide();
     }
 
-    $.get('/session/get/admin', data => {
+    // Get admin data from session
+    $.get('/session/get/admin',
+
+    /**
+     * Handles the data returns by the session.
+     * @param {String} data the admin login information
+     */
+    data => {
         socket.emit('adminLoggedOn', data);
 
         let adminData = parse(data, reviver);
 
-        console.log(adminData);
-
-        if (adminData.clients !== undefined) {
-            adminData.clients.forEach(client => {
-                newUserCell(client.username, client.email);
-            });
-        }
-    }).fail(() => {
+        if (adminData.clients !== undefined) adminData.clients.forEach(client => { newUserCell(client.username, client.email); });
+    }).fail(
+        /**
+         * Handles if the data returns an error.
+         */
+        () => {
 
         let loginModal = new Modal(document.getElementById('loginStaticBackdrop'), {backdrop: 'static'});
 
         loginModal.show();
 
-        $('#login-form').on('submit', e => {
+        $('#login-form').on('submit',
+            /**
+             * Handles the login form submit event.
+             *
+             * this functions will prevent the default sumbit behaviour
+             * of the form and save the login information to session. Lastly,
+             * publish a toast notification and fire the adminLoggedOn function.
+             *
+             * * NOTE: this is just a simple example of how the login function would behave
+             * DO NOT use this in production mode!
+             */
+            e => {
+                e.preventDefault();
 
-            e.preventDefault();
+                loginModal.hide();
 
-            loginModal.hide();
+                const loggedInAdmin = stringify({
+                    email: $('#emailInput').val(),
+                    username: $('#usernameInput').val(),
+                    position: $('#roomSelect').val(),
+                });
 
-            const loggedInAdmin = stringify({
-                email: $('#emailInput').val(),
-                username: $('#usernameInput').val(),
-                position: $('#roomSelect').val(),
-            });
+                $.post('/session/set/admin', {data: loggedInAdmin});
 
-            $.post('/session/set/admin', {data: loggedInAdmin}, data => console.log(data));
+                toast.publish({
+                    type: "success",
+                    description: `Welcome ${$('#usernameInput').val()}!`,
+                    timeout: 8000
+                });
 
-            toast.publish({
-                type: "success",
-                description: `Welcome ${$('#usernameInput').val()}!`,
-                timeout: 8000
-            });
-
-            socket.emit('adminLoggedOn', loggedInAdmin);
-        });
+                socket.emit('adminLoggedOn', loggedInAdmin);
+            }
+        );
     });
 
     checkUsers();
@@ -114,13 +130,16 @@ const onLoad = () => {
 
 // EVENT HANDLERS
 /**
+ * Handles the clientUpdate event.
  *
- * @param clientList
+ * This function will take in a stringified JSON clientList the parses it,
+ * resets the modal body then create two buttons bound with a click event
+ * and an event handler for each button per pending client.
+ * @param {String} clientList
  */
 const onClientUpdate = clientList => {
-    let parsedClientList = parse(clientList, reviver);
 
-    console.log(parsedClientList);
+    let parsedClientList = parse(clientList, reviver);
 
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
@@ -129,56 +148,71 @@ const onClientUpdate = clientList => {
     modal1_body.html('');
 
     if (parsedClientList.size !== 0) {
-        let parsedClientListIds = Array.from(parsedClientList.keys());
 
-        parsedClientListIds.forEach(id => {
-            let client = parsedClientList.get(id);
+        let parsedClientListIds = Array.from(parsedClientList.keys()); // [email1, email2, email3,...]
 
-            if (client.state === 'waiting') {
-                modal1_body.prepend(
-                    $(`<div class="d-flex">
-                            <button
-                                class="btn btn-outline-success w-100 client-select"
-                                id="${slugify(client.email)}">
-                                    ${client.username} - ${client.email}
-                            </button>
-                            <button
-                                class="btn btn-outline-success flex-shrink-1 client-forward"
-                                client-id="${client.email}"
-                                title="Forward to another admin">
-                                    <i class="fas fa-forward"></i>
-                            </button>
-                        </div>`)
+        parsedClientListIds.forEach(
+            /**
+             * Creates interactable items on the DOM for each client.
+             * @param {String} id an email acts as an id.
+             */
+            id => {
+                let client = parsedClientList.get(id);
 
-                        // Handles the client select button click event
-                        .on('click', e => {
-                            const target = $(e.target);
+                if (client.state === 'waiting') {
+                    modal1_body.prepend(
+                        $(`<div class="d-flex">
+                                <button
+                                    class="btn btn-outline-success w-100 client-select"
+                                    id="${slugify(client.email)}">
+                                        ${client.username} - ${client.email}
+                                </button>
+                                <button
+                                    class="btn btn-outline-success flex-shrink-1 client-forward"
+                                    client-id="${client.email}"
+                                    title="Forward to another admin">
+                                        <i class="fas fa-forward"></i>
+                                </button>
+                            </div>`
+                        ).on('click',
+                            /**
+                             * Handles the button click event.
+                             *
+                             * Based on the button clicked, if the button is the select button
+                             * it will create new usercell with the provided information or if it's the
+                             * forwaard button, it will trigger the onforwardBtnClicked event handler
+                             */
+                            e => { // Handles the client select button click event
+                                const target = $(e.target);
 
-                            if (target.hasClass('client-select')) {
-                                target.remove();
-                                checkUsers();
-                                newUserCell(client.username, client.email);
+                                if (target.hasClass('client-select')) {
+
+                                    target.remove();
+
+                                    checkUsers();
+
+                                    newUserCell(client.username, client.email);
+                                }
+                                else onForwardBtnClicked(e);
                             }
-                            else onForwardBtnClicked(e);
-                        })
-                );
+                        )
+                    );
+                }
             }
-        })
+        )
     }
 
     checkUsers();
 }
 
+
 /**
+ * Handles the adminUpdate event.
  *
- * @param roomList
+ *
+ * @param {String} adminList the stringified JSON admin list.
  */
 const onAdminUpdate = adminList => {
-    getAdminAccordion(adminList);
-}
-
-
-const getAdminAccordion = adminList => {
     const parsedAdminList = parse(adminList, reviver);
 
     // Selects the admin list container
@@ -210,9 +244,9 @@ const getAdminAccordion = adminList => {
 
 /**
  *
- * @param accordionContainer
- * @param parsedAdminList
- * @param mode
+ * @param {JQuery} accordionContainer the jquery element of the accordion container.
+ * @param {JSON} parsedAdminList the JSON parsed admin list.
+ * @param {String} mode A or F, where F is forward and A is invite.
  */
 const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
 
@@ -276,9 +310,9 @@ const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
                 else {
                     localAdmin = admin;
 
-                    $.post('/session/set/admin', {data: stringify(localAdmin)}, data => console.log('localAdmin Updated!'));
+                    $.post('/session/set/admin', {data: stringify(localAdmin)});
 
-                    $.get('/session/get/admin', data => console.log(data));
+                    $.get('/session/get/admin');
                 }
             }
         });
@@ -288,41 +322,58 @@ const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
 }
 
 /**
+ * Handles the forward button click event.
  *
- * @param e
+ * This function will select the client as selected forward client
+ * then hides the pending client modal and shows the admin select modal.
+ * @param {Event} e the event object.
  */
 const onForwardBtnClicked = e => {
 
     const waitListEl = document.getElementById('exampleModal');
     const adminForwardListEl = document.getElementById('adminStaticBackdrop');
-    const waitListModal = Modal.getInstance(waitListEl);
     const adminForwardListModal = Modal.getInstance(adminForwardListEl) || new Modal(adminForwardListEl, {backdrop: 'static'});
 
     if ($(e.target).hasClass('btn')) selected_forward_client = $(e.target).attr('client-id');
 
     else selected_forward_client = $(e.target).parent('.btn').attr('client-id',);
 
-    waitListModal.hide();
+    Modal.getInstance(waitListEl).hide();
 
     adminForwardListModal.show();
 }
 
 /**
+ * Handles the chatLogUpdate event.
  *
- * @param chatLog
+ * this function will clear the chat area and populate it with
+ * the meessages fron the chat log.
+ * @param {Array<object>} chatLog the array contains the messages of the selected room.
  */
 const onChatLogUpdate = chatLog => {
-    const chatAreaMain = $('.chat-area-main');
 
-    chatAreaMain.html('');
+    $('.chat-area-main').html('');
 
-    chatLog.forEach(message => onMessage({sender: message.from, message: message.message, roomId: selected_client}));
+    chatLog.forEach(
+        /**
+         * Triggers the message event handler for each message.
+         * @param {object} message the message object
+         */
+        message => onMessage({
+            sender:  message.from,
+            message: message.message,
+            roomId:  selected_client
+        })
+    );
 }
 
 /**
+ * Handles the onRequestReceieved function.
  *
- * @param from
- * @param clientId
+ * This function will process to request, it will first check
+ * for the type then publish a toast notification with the content
+ * based on the type.
+ * @param {object} object
  */
 const onRequestReceived = ({from, client, type}) => {
 
@@ -366,26 +417,34 @@ const onRequestReceived = ({from, client, type}) => {
 }
 
 /**
+ * Handles the onRequestAccepted event.
  *
- * @param message
- * @returns {*}
+ * The function will first process the response message
+ * then it will whether the response type is forward or invite.
+ * if forword then remove that user cell and the coressponding chat log
+ * then select the nextdoor usercell, if not then populate the view with default values.
+ * @param {object} object an object contains the message information.
  */
 const onRequestAccepted = ({type, message}) => {
+
     processRequestResponse(message, "info");
 
     if (type === "forward"){
         if (selected_forward_client === selected_client) {
 
-            console.log('forwarded')
-
+            // Removes the usercell
             $(`[client-id="${selected_forward_client}"]`).remove();
 
+            // Looks for the next usercell.
             let selectedClients = $('.conversation-area').find('.msg');
 
+            // If there's one
             if (selectedClients.length !== 0) {
                 $(selectedClients[0]).trigger('click');
             }
-            else {
+            else { // If not
+
+                // Set default values.
                 $('.chat-area-main').html('');
 
                 $(`
@@ -403,21 +462,22 @@ const onRequestAccepted = ({type, message}) => {
 
         }
     }
-
 };
 
 /**
- *
- * @param message
- * @returns {*}
+ * Handles the requestDeclined event
+ * @param {object} object
  */
 const onRequestDeclined = ({message}) => processRequestResponse(message, "danger");
 
 /**
+ * Handles the message event.
  *
- * @param sender
- * @param message
- * @param roomId
+ * This function will first check whether the message is comming from
+ * the selected client room, if true then create chat bubble based on the sender.
+ * @param {String} sender the sender id.
+ * @param {object} message the message object.
+ * @param {String} roomId the room id.
  */
 const onMessage = ({sender, message, roomId}) => {
 
@@ -435,22 +495,28 @@ const onMessage = ({sender, message, roomId}) => {
 }
 
 /**
+ * Handles clientConnected event.
  *
- * @param id
+ * This function will publish a toast notification when a client disconnects.
+ * @param {object} object an object contains the client information.
  */
-const onClientDisconnect = id => {
+const onClientDisconnect = ({id, email}) => {
     toast.publish({
         type: "info",
         description: `Client (${id}) has disconnected!`,
         timeout: 8000
     });
 
-    $(`#${id}`).removeClass('online');
+    $(`#${slugify(email)}`).removeClass('online');
 }
 
 /**
+ * Handles the form submit event.
  *
- * @param e
+ * This function will first prevent the default behaviour of the form
+ * which is the submission, then it will get the value of the input form control
+ * and send it as an event to the server. Lastly, trigger the form reset event.
+ * @param {Event} e Event object.
  */
 const onFormSubmit = e => {
 
@@ -465,7 +531,12 @@ const onFormSubmit = e => {
 
 /**
  * Handles click event on user cell.
- * @param {Event} e Event object
+ *
+ * This function will if the usercell or the content of the
+ * usercell is clicked, it will then set the usercell is active
+ * and set the selected client and the selected forward client to
+ * the clicked user email, after that it will fire the clientSwitched event.
+ * @param {Event} e Event object.
  */
 const userCellClicked = e => {
     const active_user_cell = $('.msg.active');
@@ -498,8 +569,8 @@ const userCellClicked = e => {
 
 /**
  *
- * @param message
- * @param type
+ * @param {String} message
+ * @param {String} type
  */
 const processRequestResponse = (message, type) => toast.publish({
     type: type,
@@ -508,7 +579,7 @@ const processRequestResponse = (message, type) => toast.publish({
 });
 
 /**
- * Checks if there are clients waiting
+ * Checks if there are clients on the waiting list
  */
 const checkUsers = () => {
     modal_body.each(function() {
@@ -524,42 +595,59 @@ const checkUsers = () => {
 
 /**
  * Creates a new user cell and initiates the conversation.
- * @param username
- * @param client_email The id of the selected client.
+ *
+ * This function creates a new usercell then fire the clientSelected event,
+ * set the selected client to the usercell owner.
+ * @param {String} username the username of the selected client.
+ * @param {String} client_email The id of the selected client.
  */
 const newUserCell = (username, client_email) => {
     const new_user_cell =
         $(`
-        <div class="msg online" id="${slugify(client_email)}" client-id="${client_email}">
-            <img
-                class="msg-profile"
-                src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
-            <div class="msg-detail">
-                <div class="msg-username">${username} - ${client_email}</div>
-                <div class="msg-content">
-                    <span class="msg-message">What time was our meet</span>
-                    <span class="msg-date">20m</span>
+            <div class="msg online" id="${slugify(client_email)}" client-id="${client_email}">
+                <img
+                    class="msg-profile"
+                    src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3364143/download+%282%29.png" alt="">
+                <div class="msg-detail">
+                    <div class="msg-username">${username} - ${client_email}</div>
+                    <div class="msg-content">
+                        <span class="msg-message">What time was our meet</span>
+                        <span class="msg-date">20m</span>
+                    </div>
                 </div>
             </div>
-        </div>`)
+        `);
 
     socket.emit('clientSelected', client_email);
 
+    // append the user cell
     $('.conversation-area').prepend(new_user_cell);
 
+    // Sets the selected client.
     selected_client = client_email;
 
+    // Selects all user cells.
     user_cells = $('.msg');
 
+    // Removse the click event listener.
     user_cells.off('click');
 
-    user_cells.on('click', e => userCellClicked(e));
+    // Binds the click event with the event handler.
+    user_cells.on('click',
+        /**
+         * Triggers the usercell function.
+         */
+        e => userCellClicked(e));
 
+    // triggers the event.
     new_user_cell.trigger('click');
 }
 
 /**
  * Creates a chat bubble.
+ *
+ * This function creates chat bubble and append it to the chat area
+ * based on the sender.
  * @param {String} input Text message.
  * @param {String} role receiver or sender?
  */
@@ -604,6 +692,7 @@ const createChatBubble = (input, role) => {
         }
     }
 
+    // Keep the chat area showing the latest chat message.
     chat_area.scrollTop = chat_area.scrollHeight;
 }
 
@@ -613,7 +702,10 @@ const { reviver } = require('../../utils/mapUtitls');
 
 const {parse, stringify} = require('flatted');
 
-// Slugify a string
+/**
+ * Slugifies a string.
+ * @param {String} str a string to slugify.
+ */
 function slugify(str)
 {
     str = str.replace(/^\s+|\s+$/g, '');
@@ -638,6 +730,4 @@ function slugify(str)
     return str;
 }
 
-$(function() {
-    onLoad();
-})
+$(function() { onLoad(); });

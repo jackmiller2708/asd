@@ -225,7 +225,7 @@ function onChatFormSubmit(e) {
  *
  * @param {function} fn what to do while waiting for t time.
  * @param {Number} t time to wait for.
- * @returns {function}
+ * @returns {function} a function to keep on the chain.
  */
 function delay(fn, t) {
     // private instance variables
