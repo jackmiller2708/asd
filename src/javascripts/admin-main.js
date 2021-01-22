@@ -32,6 +32,7 @@ let selected_client;
 let selected_forward_client;
 let localRoomList = new Map();
 let localAdmin;
+let localClients;
 
 // FUNCTIONS ============================
 /**
@@ -79,7 +80,12 @@ const onLoad = () => {
 
         let adminData = parse(data, reviver);
 
-        if (adminData.clients !== undefined) adminData.clients.forEach(client => { newUserCell(client.username, client.email); });
+        setTimeout(() =>{
+            if (adminData.clients !== undefined) adminData.clients.forEach(clientEmail => {
+                let client = localClients.get(clientEmail);
+                newUserCell(client.username, client.email);
+            });
+        }, 500);
     }).fail(
         /**
          * Handles if the data returns an error.
@@ -112,8 +118,6 @@ const onLoad = () => {
                     position: $('#roomSelect').val(),
                 });
 
-                $.post('/session/set/admin', {data: loggedInAdmin});
-
                 toast.publish({
                     type: "success",
                     description: `Welcome ${$('#usernameInput').val()}!`,
@@ -140,6 +144,8 @@ const onLoad = () => {
 const onClientUpdate = clientList => {
 
     let parsedClientList = parse(clientList, reviver);
+
+    localClients = parsedClientList;
 
     // Selects the client list container
     let modal1_body = $('#exampleModal').find('.modal-body');
@@ -285,34 +291,38 @@ const getAdminAccordionItems = (accordionContainer, parsedAdminList, mode) => {
         accordionItemBody.appendTo(accordionItemBodyContainer);
 
         parsedAdminList.forEach(admin => {
-            let adminSocketId = admin.socketIds[0];
+            if (admin.state === 'online') {
 
-            if (adminRooms[admin.position] === id) {
-                let room = localRoomList.get(id);
+                let adminSocketId = admin.socketIds[0];
 
-                if (room !== undefined)  room.push(admin.email);
-                else localRoomList.set(id, [admin.email]);
+                if (adminRooms[admin.position] === id) {
+                    let room = localRoomList.get(id);
 
-                if (!admin.socketIds.includes(socket.id)) {
-                    accordionItemBody.prepend(
-                        $(`
-                            <div>
-                                <button class="btn btn-outline-success w-100" id="${mode === "A" ? adminSocketId : adminSocketId + '-f'}">${admin.username}</button>
-                            </div>`).on('click', () => {
-                                if (mode === "A")
-                                    socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_client, type: "invite"});
-                                else
-                                    socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_forward_client, type: "forward"});
-                        })
-                    );
-                }
+                    if (room !== undefined)  room.push(admin.email);
+                    else localRoomList.set(id, [admin.email]);
 
-                else {
-                    localAdmin = admin;
+                    if (!admin.socketIds.includes(socket.id)) {
+                        accordionItemBody.prepend(
+                            $(`
+                                <div>
+                                    <button class="btn btn-outline-success w-100" id="${mode === "A" ? adminSocketId : adminSocketId + '-f'}">${admin.username}</button>
+                                </div>`).on('click', () => {
+                                    if (mode === "A")
+                                        socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_client, type: "invite"});
+                                    else
+                                        socket.emit('requestSent', {to: adminSocketId, clientEmail: selected_forward_client, type: "forward"});
+                            })
+                        );
+                    }
 
-                    $.post('/session/set/admin', {data: stringify(localAdmin)});
+                    else {
+                        if (mode === "A") {
 
-                    $.get('/session/get/admin');
+                            localAdmin = admin;
+
+                            $.post('/session/set/admin', {data: stringify(localAdmin)});
+                        }
+                    }
                 }
             }
         });

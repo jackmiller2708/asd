@@ -14,16 +14,9 @@ class Client extends User {
        description: ""
      };
     this.reps = options.reps || [];
-    this.state = options.state || "waiting";
   }
 
-  //region State
-  setState(state) {this.state = state;}
-
-  getState() {return this.state;}
-  //endregion
-
-  //region Reps
+  //#region Reps
   addRep(rep) {this.reps.push(rep);}
 
   removeRep(rep) {this.reps.splice(this.reps.indexOf(rep), 1);}
@@ -31,7 +24,9 @@ class Client extends User {
   resetReps() {this.reps = [];}
 
   getReps() {return this.reps;}
-  //endregion
+  //#endregion
+
+  reset() {this.resetReps(); this.resetSocketIds(); this.state = 'offline';}
 }
 
 module.exports = Client;

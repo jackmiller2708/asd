@@ -12,10 +12,10 @@ class Admin extends User{
     super(options);
 
     this.position = options.position || "";
-    this.clients  = options.clients || [];
+    this.clients  = options.clients  || [];
   }
 
-  //region Position
+  //#region Position
   /**
    * Sets the admin's position.
    * @param {String} position
@@ -26,9 +26,9 @@ class Admin extends User{
    * @returns {String} the admin's position.
    */
   getPosition() {return this.position;}
-  //endregion
+  //#endregion
 
-  //region Clients
+  //#region Clients
   /**
    * Addes the client id to the active client list.
    * @param {String} client
@@ -37,7 +37,7 @@ class Admin extends User{
 
   /**
    * Removes client id from the active client list.
-   * @param {String} client
+   * @param {String} client the client to be removed.
    */
   removeClient(client) {this.clients.splice(this.clients.indexOf(client), 1);}
 
@@ -45,7 +45,12 @@ class Admin extends User{
    * @returns {Array<String>} the admin's list of active client ids.
    */
   getClients() {return this.clients}
-  //endregion
+
+  /**
+   * Resets the clients attribute.
+   */
+  resetClients() {this.clients = [];}
+  //#endregion
 }
 
 module.exports = Admin;

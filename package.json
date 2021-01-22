@@ -12,7 +12,8 @@
     "core-js": "^3.8.1",
     "express": "~4.16.1",
     "http-errors": "~1.6.3",
-    "morgan": "~1.9.1"
+    "morgan": "~1.9.1",
+    "socket.io-redis": "^6.0.1"
   },
   "devDependencies": {
     "@fortawesome/fontawesome-free": "^5.15.1",
